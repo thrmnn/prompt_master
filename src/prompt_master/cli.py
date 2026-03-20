@@ -84,7 +84,7 @@ def main(ctx):
 def optimize(idea, mode, target, output, no_api, model, max_tokens, output_format):
     """Transform a vague idea into an optimized prompt."""
     target = target or config_get("target", "general")
-    model = model or config_get("model", "sonnet")
+    model = model or config_get("model", "haiku")
     max_tokens = max_tokens or config_get("max_tokens", 4096)
     output_format = output_format or config_get("format", "markdown")
 
@@ -109,8 +109,7 @@ def optimize(idea, mode, target, output, no_api, model, max_tokens, output_forma
 
     if not result.used_api and not no_api:
         click.echo(
-            "Note: No API key found. Using template-based optimization.\n"
-            "Set ANTHROPIC_API_KEY for AI-powered optimization.\n",
+            click.style("  Using template mode (API unavailable).", fg="yellow"),
             err=True,
         )
 
@@ -200,7 +199,7 @@ def _format_output(result, fmt: str) -> str:
 def chat(idea, target, resume, output, model):
     """Start an interactive chat session to build a prompt collaboratively."""
     target = target or config_get("target", "general")
-    model = model or config_get("model", "sonnet")
+    model = model or config_get("model", "haiku")
     run_chat(
         idea=idea or None,
         target=target,
@@ -288,8 +287,12 @@ def vibe(idea, target, count, dimensions, output, no_api):
         try:
             variations = engine.generate_variations(count=count, dimensions=dim_list)
         except Exception as e:
-            click.echo(f"  Error generating variations: {e}", err=True)
-            # Fall back
+            click.echo(
+                click.style(
+                    f"  API unavailable ({type(e).__name__}), using template mode.", fg="yellow"
+                ),
+                err=True,
+            )
             variations = engine._fallback_variations(count, dim_list)
             engine.variations = variations
 
@@ -369,8 +372,9 @@ def vibe(idea, target, count, dimensions, output, no_api):
 def tui(idea, target, resume, output, model, no_api):
     """Open the interactive canvas for visual prompt crafting."""
     target = target or config_get("target", "general")
-    model = model or config_get("model", "sonnet")
+    model = model or config_get("model", "haiku")
     from prompt_master.tui import launch_tui
+
     launch_tui(
         idea=idea or None,
         target=target,
@@ -418,8 +422,8 @@ def tui(idea, target, resume, output, model, no_api):
 )
 def benchmark(domain, no_api, judge, save_results, tag):
     """Run the benchmark suite to evaluate prompt quality."""
-    from benchmarks.report import format_report
-    from benchmarks.runner import run_benchmark, save_report
+    from prompt_master.benchmarks.report import format_report
+    from prompt_master.benchmarks.runner import run_benchmark, save_report
 
     click.echo("\n  Running benchmarks...\n")
     report = run_benchmark(

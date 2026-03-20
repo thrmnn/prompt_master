@@ -2,8 +2,6 @@
 
 import json
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -74,7 +72,7 @@ class TestConfig:
         monkeypatch.setattr("prompt_master.config.CONFIG_PATH", tmp_path / "nope.toml")
         config = load_config()
         assert config["target"] == "general"
-        assert config["model"] == "sonnet"
+        assert config["model"] == "haiku"
 
     def test_load_config_reads_file(self, tmp_path, monkeypatch):
         cfg_file = tmp_path / "config.toml"
@@ -83,7 +81,7 @@ class TestConfig:
         config = load_config()
         assert config["target"] == "code"
         assert config["max_tokens"] == 2048
-        assert config["model"] == "sonnet"  # default preserved
+        assert config["model"] == "haiku"  # default preserved
 
 
 # ── History ─────────────────────────────────────────────────────────────────
@@ -168,6 +166,7 @@ class TestSessionsCLI:
     def test_sessions_list_with_data(self):
         from prompt_master.session import save_session, generate_session_id
         from prompt_master.conversation import ConversationEngine
+
         engine = ConversationEngine(target="code")
         engine.add_user_message("test")
         save_session(generate_session_id(), engine)
@@ -180,6 +179,7 @@ class TestSessionsCLI:
     def test_sessions_delete(self):
         from prompt_master.session import save_session, generate_session_id
         from prompt_master.conversation import ConversationEngine
+
         sid = generate_session_id()
         save_session(sid, ConversationEngine())
 
@@ -193,8 +193,13 @@ class TestSessionsCLI:
         old_data = {
             "session_id": "old123",
             "created_at": (datetime.now(timezone.utc) - timedelta(days=60)).isoformat(),
-            "engine": {"target": "general", "phase": "exploring", "messages": [],
-                       "current_draft": "", "final_prompt": ""},
+            "engine": {
+                "target": "general",
+                "phase": "exploring",
+                "messages": [],
+                "current_draft": "",
+                "final_prompt": "",
+            },
         }
         (self.sessions_dir / "old123.json").write_text(json.dumps(old_data))
 
@@ -245,9 +250,7 @@ class TestClientFeatures:
 class TestOutputFormats:
     def test_json_format(self):
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["optimize", "test idea", "--no-api", "--format", "json"]
-        )
+        result = runner.invoke(main, ["optimize", "test idea", "--no-api", "--format", "json"])
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert "optimized_prompt" in data
@@ -255,18 +258,14 @@ class TestOutputFormats:
 
     def test_plain_format(self):
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["optimize", "test idea", "--no-api", "--format", "plain"]
-        )
+        result = runner.invoke(main, ["optimize", "test idea", "--no-api", "--format", "plain"])
         assert result.exit_code == 0
         assert "#" not in result.output  # markdown headers stripped
         assert "ROLE" in result.output  # converted to uppercase
 
     def test_markdown_format(self):
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["optimize", "test idea", "--no-api", "--format", "markdown"]
-        )
+        result = runner.invoke(main, ["optimize", "test idea", "--no-api", "--format", "markdown"])
         assert result.exit_code == 0
         assert "# Role" in result.output
 

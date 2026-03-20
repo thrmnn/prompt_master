@@ -185,6 +185,7 @@ class CanvasApp(App):
 
         # Check cache first
         from prompt_master.vibe import _parse_sections
+
         sections = _parse_sections(self.canvas.get_prompt_text())
         content = sections.get(section, "")
         cache_key = self._variation_cache.content_key(section, content)
@@ -204,6 +205,7 @@ class CanvasApp(App):
     def _preload_variations(self, section: str) -> None:
         """Pre-generate variations in background (triggered by deep dwell)."""
         from prompt_master.vibe import _parse_sections
+
         sections = _parse_sections(self.canvas.get_prompt_text())
         content = sections.get(section, "")
         cache_key = self._variation_cache.content_key(section, content)
@@ -227,6 +229,7 @@ class CanvasApp(App):
         if not self._no_api:
             try:
                 from prompt_master.client import ClaudeClient
+
                 client = ClaudeClient(model="haiku")
             except Exception:
                 pass
@@ -257,6 +260,7 @@ class CanvasApp(App):
             pass
 
         from prompt_master.tui.section_block import SectionEditor
+
         for editor in self.query(SectionEditor):
             if editor.has_focus:
                 return
@@ -267,6 +271,7 @@ class CanvasApp(App):
 
         # Save original content for revert on Esc
         from prompt_master.vibe import _parse_sections
+
         sections = _parse_sections(self.canvas.get_prompt_text())
         self._steer_original = sections.get(section, "")
         self._steer_section = section
@@ -293,7 +298,9 @@ class CanvasApp(App):
         self._run_scoring()
         self._auto_copy()
 
-    def on_dimension_navigator_dimension_changed(self, message: DimensionNavigator.DimensionChanged) -> None:
+    def on_dimension_navigator_dimension_changed(
+        self, message: DimensionNavigator.DimensionChanged
+    ) -> None:
         """Discrete dimension navigator — also supported via the old path."""
         from prompt_master.tui.section_vibe import _manual_section_variant
 
@@ -304,7 +311,9 @@ class CanvasApp(App):
         new_content = _manual_section_variant(section, original, message.dimension, message.value)
         self.canvas.update_section(section, new_content, highlight=False)
 
-    def on_dimension_navigator_navigator_closed(self, message: DimensionNavigator.NavigatorClosed) -> None:
+    def on_dimension_navigator_navigator_closed(
+        self, message: DimensionNavigator.NavigatorClosed
+    ) -> None:
         self._run_scoring()
         self._auto_copy()
 
@@ -332,20 +341,22 @@ class CanvasApp(App):
 
     def _generate_initial(self) -> None:
         from prompt_master.session import generate_session_id
+
         self._session_id = generate_session_id()
         self.canvas.status_line.update_session(self._session_id)
         self.canvas.show_loading("generating prompt...")
         self.run_worker(self._stream_initial, name="generate", thread=True)
 
     def _stream_initial(self) -> None:
-        from prompt_master.client import ClaudeClient, NoAPIKeyError
+        from prompt_master.client import ClaudeClient
         from prompt_master.optimizer import META_SYSTEM_PROMPT, TARGET_INSTRUCTIONS
 
         try:
-            client = ClaudeClient(model=self._model or "sonnet")
-        except NoAPIKeyError:
+            client = ClaudeClient(model=self._model or "haiku")
+        except Exception:
             from prompt_master.optimizer import optimize_prompt
             from prompt_master.vibe import _parse_sections
+
             result = optimize_prompt(self._idea, self._target, use_api=False)
             sections = _parse_sections(result.optimized_prompt)
             self.call_from_thread(self._finish_generation, sections, None)
@@ -359,16 +370,24 @@ class CanvasApp(App):
             for chunk in client.generate_stream(META_SYSTEM_PROMPT, user_msg):
                 accumulated += chunk
                 self.call_from_thread(self._stream_update, accumulated)
-        except Exception as e:
-            self.call_from_thread(self._generation_error, str(e))
-            return
+        except Exception:
+            if not accumulated:
+                from prompt_master.optimizer import optimize_prompt
+                from prompt_master.vibe import _parse_sections
+
+                result = optimize_prompt(self._idea, self._target, use_api=False)
+                sections = _parse_sections(result.optimized_prompt)
+                self.call_from_thread(self._finish_generation, sections, None)
+                return
 
         from prompt_master.vibe import _parse_sections
+
         sections = _parse_sections(accumulated)
         self.call_from_thread(self._finish_generation, sections, client)
 
     def _stream_update(self, text_so_far: str) -> None:
         from prompt_master.vibe import _parse_sections
+
         sections = _parse_sections(text_so_far)
         for name, content in sections.items():
             if name == "_preamble" or not content.strip():
@@ -465,8 +484,9 @@ class CanvasApp(App):
         # Invalidate variation cache for updated sections
         for name in updated:
             from prompt_master.vibe import _parse_sections
+
             content = _parse_sections(self.canvas.get_prompt_text()).get(name, "")
-            cache_key = self._variation_cache.content_key(name, content)
+            self._variation_cache.content_key(name, content)
             # Old cache entries are stale — removal happens naturally via LRU
 
     def _refinement_error(self, error_msg: str) -> None:
@@ -496,6 +516,7 @@ class CanvasApp(App):
     def _load_session(self) -> None:
         from prompt_master.session import load_session
         from prompt_master.vibe import _parse_sections
+
         try:
             session_id, engine = load_session(self._resume)
             self._session_id = session_id
