@@ -19,6 +19,7 @@ from textual.widgets import Static
 # Messages
 # ---------------------------------------------------------------------------
 
+
 class PromptUpdated(Message):
     """Posted when an AI response contains prompt section updates.
 
@@ -34,6 +35,7 @@ class PromptUpdated(Message):
 # ---------------------------------------------------------------------------
 # Internal sub-widgets
 # ---------------------------------------------------------------------------
+
 
 class _UserBubble(Static):
     """Displays the user's message in the conversation zone."""
@@ -81,6 +83,7 @@ class _UpdateSummary(Static):
 # ---------------------------------------------------------------------------
 # ConversationZone
 # ---------------------------------------------------------------------------
+
 
 class ConversationZone(Container):
     """Ephemeral dialogue surface showing the last exchange.
@@ -203,6 +206,7 @@ class ConversationZone(Container):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _truncate(text: str, max_lines: int = 2, max_chars: int = 120) -> str:
     """Truncate *text* to fit in the compact conversation zone."""

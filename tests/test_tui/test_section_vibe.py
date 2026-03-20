@@ -1,10 +1,7 @@
 """Tests for section-level variation generation (fallback / offline path)."""
 
-import pytest
-
 from prompt_master.tui.section_vibe import (
     _fallback_section_variations,
-    generate_section_variations,
 )
 
 

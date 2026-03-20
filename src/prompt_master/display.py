@@ -68,9 +68,7 @@ def show_final_prompt(prompt: str):
 
 def show_saved(session_id: str):
     """Confirm session save."""
-    click.echo(
-        click.style(f"\n  Session saved: {session_id[:8]}", **STYLE_DIM)
-    )
+    click.echo(click.style(f"\n  Session saved: {session_id[:8]}", **STYLE_DIM))
     click.echo(
         click.style(
             f"  Resume with: prompt-master chat --resume {session_id[:8]}",

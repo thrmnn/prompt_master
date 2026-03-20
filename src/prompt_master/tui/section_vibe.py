@@ -26,6 +26,7 @@ from prompt_master.vibe import (
 # Public entry point
 # ---------------------------------------------------------------------------
 
+
 def generate_section_variations(
     section_name: str,
     section_content: str,
@@ -88,6 +89,7 @@ def generate_section_variations(
 # API-based generation
 # ---------------------------------------------------------------------------
 
+
 def _api_section_variations(
     section_name: str,
     section_content: str,
@@ -109,10 +111,7 @@ def _api_section_variations(
     if dimensions:
         dim_instruction = f"Focus on these dimensions: {', '.join(dimensions)}."
     else:
-        dim_instruction = (
-            "Choose diverse dimensions to create meaningfully "
-            "different alternatives."
-        )
+        dim_instruction = "Choose diverse dimensions to create meaningfully different alternatives."
 
     user_message = (
         f"I have a prompt section called **{section_name}** with this content:\n\n"
@@ -129,17 +128,20 @@ def _api_section_variations(
 
     results: List[dict] = []
     for v in parsed[:count]:
-        results.append({
-            "dimension": v.dimension,
-            "value": v.value,
-            "content": v.prompt,
-        })
+        results.append(
+            {
+                "dimension": v.dimension,
+                "value": v.value,
+                "content": v.prompt,
+            }
+        )
     return results
 
 
 # ---------------------------------------------------------------------------
 # Template / fallback generation
 # ---------------------------------------------------------------------------
+
 
 def _fallback_section_variations(
     section_name: str,
@@ -187,11 +189,13 @@ def _fallback_section_variations(
             # Nothing changed — build a meaningful rewrite by hand
             final_content = _manual_section_variant(section_name, section_content, dim, value)
 
-        results.append({
-            "dimension": dim,
-            "value": value,
-            "content": final_content,
-        })
+        results.append(
+            {
+                "dimension": dim,
+                "value": value,
+                "content": final_content,
+            }
+        )
 
         if len(results) >= count:
             break
@@ -206,35 +210,87 @@ def _manual_section_variant(section_name: str, content: str, dim: str, value: st
         # Tone
         ("tone", "formal"): lambda c: f"In a formal, professional manner:\n{c}",
         ("tone", "casual"): lambda c: f"In a relaxed, approachable way:\n{c}",
-        ("tone", "technical"): lambda c: f"Using precise technical terminology:\n{c}\n\nInclude specifications and standards where applicable.",
-        ("tone", "playful"): lambda c: f"In an engaging, fun way:\n{c}\n\nUse creative analogies to make concepts memorable.",
-        ("tone", "authoritative"): lambda c: f"With authority and confidence:\n{c}\n\nBe definitive. Recommend best practices, not options.",
-        ("tone", "empathetic"): lambda c: f"With empathy and patience:\n{c}\n\nAcknowledge challenges. Guide step by step.",
+        ("tone", "technical"): lambda c: (
+            f"Using precise technical terminology:\n{c}\n\nInclude specifications and standards where applicable."
+        ),
+        ("tone", "playful"): lambda c: (
+            f"In an engaging, fun way:\n{c}\n\nUse creative analogies to make concepts memorable."
+        ),
+        ("tone", "authoritative"): lambda c: (
+            f"With authority and confidence:\n{c}\n\nBe definitive. Recommend best practices, not options."
+        ),
+        ("tone", "empathetic"): lambda c: (
+            f"With empathy and patience:\n{c}\n\nAcknowledge challenges. Guide step by step."
+        ),
         # Audience
-        ("audience", "beginner"): lambda c: f"For someone with no prior experience:\n{c}\n\nDefine all terms. Use simple analogies. Build from first principles.",
-        ("audience", "expert"): lambda c: f"For a domain expert (skip basics):\n{c}\n\nFocus on edge cases, trade-offs, and advanced patterns.",
-        ("audience", "executive"): lambda c: f"For a decision-maker (lead with impact):\n{c}\n\nQuantify benefits. Keep it concise. End with clear recommendations.",
-        ("audience", "child"): lambda c: f"For a curious 10-year-old:\n{c}\n\nUse fun comparisons and real-world examples. Keep sentences short.",
-        ("audience", "developer"): lambda c: f"For an experienced developer:\n{c}\n\nInclude code snippets, API references, and practical implementation details.",
-        ("audience", "general"): lambda c: f"For a general audience:\n{c}\n\nDefine key terms on first use. Balance accessibility with depth.",
+        ("audience", "beginner"): lambda c: (
+            f"For someone with no prior experience:\n{c}\n\nDefine all terms. Use simple analogies. Build from first principles."
+        ),
+        ("audience", "expert"): lambda c: (
+            f"For a domain expert (skip basics):\n{c}\n\nFocus on edge cases, trade-offs, and advanced patterns."
+        ),
+        ("audience", "executive"): lambda c: (
+            f"For a decision-maker (lead with impact):\n{c}\n\nQuantify benefits. Keep it concise. End with clear recommendations."
+        ),
+        ("audience", "child"): lambda c: (
+            f"For a curious 10-year-old:\n{c}\n\nUse fun comparisons and real-world examples. Keep sentences short."
+        ),
+        ("audience", "developer"): lambda c: (
+            f"For an experienced developer:\n{c}\n\nInclude code snippets, API references, and practical implementation details."
+        ),
+        ("audience", "general"): lambda c: (
+            f"For a general audience:\n{c}\n\nDefine key terms on first use. Balance accessibility with depth."
+        ),
         # Format
         ("format", "prose"): lambda c: f"In flowing prose (no bullet points):\n{c}",
-        ("format", "bullets"): lambda c: "As bullet points:\n" + "\n".join(f"- {line.strip()}" for line in c.splitlines() if line.strip()),
-        ("format", "step-by-step"): lambda c: "As a numbered step-by-step guide:\n" + "\n".join(f"{i+1}. {line.strip()}" for i, line in enumerate(c.splitlines()) if line.strip()),
-        ("format", "code"): lambda c: f"{c}\n\nInclude working code examples for every concept. Use fenced code blocks.",
-        ("format", "dialogue"): lambda c: f"Framed as a Q&A dialogue:\nQ: What does this involve?\nA: {c}",
-        ("format", "report"): lambda c: f"Structured as a formal report:\n\n## Overview\n{c}\n\n## Details\n[expand on each aspect]",
+        ("format", "bullets"): lambda c: (
+            "As bullet points:\n"
+            + "\n".join(f"- {line.strip()}" for line in c.splitlines() if line.strip())
+        ),
+        ("format", "step-by-step"): lambda c: (
+            "As a numbered step-by-step guide:\n"
+            + "\n".join(
+                f"{i + 1}. {line.strip()}" for i, line in enumerate(c.splitlines()) if line.strip()
+            )
+        ),
+        ("format", "code"): lambda c: (
+            f"{c}\n\nInclude working code examples for every concept. Use fenced code blocks."
+        ),
+        ("format", "dialogue"): lambda c: (
+            f"Framed as a Q&A dialogue:\nQ: What does this involve?\nA: {c}"
+        ),
+        ("format", "report"): lambda c: (
+            f"Structured as a formal report:\n\n## Overview\n{c}\n\n## Details\n[expand on each aspect]"
+        ),
         # Specificity
-        ("specificity", "broad"): lambda c: f"Explore the full breadth of:\n{c}\n\nCover multiple approaches, angles, and trade-offs.",
-        ("specificity", "narrow"): lambda c: f"Focus deeply on the single most critical aspect of:\n{c}\n\nIgnore tangential concerns. Go deep on this one thing.",
-        ("specificity", "exploratory"): lambda c: f"Take an exploratory approach:\n{c}\n\nRaise open questions. Identify unknowns. Map what needs investigation.",
-        ("specificity", "precise"): lambda c: f"Be maximally precise:\n{c}\n\nEvery claim must be specific and verifiable. No hedging language.",
+        ("specificity", "broad"): lambda c: (
+            f"Explore the full breadth of:\n{c}\n\nCover multiple approaches, angles, and trade-offs."
+        ),
+        ("specificity", "narrow"): lambda c: (
+            f"Focus deeply on the single most critical aspect of:\n{c}\n\nIgnore tangential concerns. Go deep on this one thing."
+        ),
+        ("specificity", "exploratory"): lambda c: (
+            f"Take an exploratory approach:\n{c}\n\nRaise open questions. Identify unknowns. Map what needs investigation."
+        ),
+        ("specificity", "precise"): lambda c: (
+            f"Be maximally precise:\n{c}\n\nEvery claim must be specific and verifiable. No hedging language."
+        ),
         # Style
-        ("style", "concise"): lambda c: " ".join(c.split()[:25]) + ("." if len(c.split()) > 25 else ""),
-        ("style", "verbose"): lambda c: f"{c}\n\nProvide thorough explanations for every point. Include multiple examples. Anticipate and address follow-up questions.",
-        ("style", "academic"): lambda c: f"In academic style:\n{c}\n\nReference established frameworks. Structure as thesis, evidence, conclusion.",
-        ("style", "conversational"): lambda c: f"Think of it this way:\n{c}\n\nExplain the 'why' behind each point. Use 'you' and 'we'.",
-        ("style", "poetic"): lambda c: f"With vivid, evocative language:\n{c}\n\nUse metaphors and imagery to illuminate the concepts.",
+        ("style", "concise"): lambda c: (
+            " ".join(c.split()[:25]) + ("." if len(c.split()) > 25 else "")
+        ),
+        ("style", "verbose"): lambda c: (
+            f"{c}\n\nProvide thorough explanations for every point. Include multiple examples. Anticipate and address follow-up questions."
+        ),
+        ("style", "academic"): lambda c: (
+            f"In academic style:\n{c}\n\nReference established frameworks. Structure as thesis, evidence, conclusion."
+        ),
+        ("style", "conversational"): lambda c: (
+            f"Think of it this way:\n{c}\n\nExplain the 'why' behind each point. Use 'you' and 'we'."
+        ),
+        ("style", "poetic"): lambda c: (
+            f"With vivid, evocative language:\n{c}\n\nUse metaphors and imagery to illuminate the concepts."
+        ),
     }
 
     rewriter = rewrites.get((dim, value))

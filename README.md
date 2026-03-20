@@ -15,7 +15,7 @@
 *Parallelization-aware. Multi-agent workflow native.*
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue)](#installation)
-[![Tests](https://img.shields.io/badge/tests-180%2B%20passing-brightgreen)](#testing)
+[![Tests](https://img.shields.io/badge/tests-330%2B%20passing-brightgreen)](#testing)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](#license)
 
 </div>

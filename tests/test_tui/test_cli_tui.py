@@ -1,6 +1,5 @@
 """Tests for TUI CLI integration — verifies the `tui` subcommand is wired up."""
 
-import pytest
 from click.testing import CliRunner
 
 from prompt_master.cli import main
@@ -21,7 +20,11 @@ class TestTuiHelp:
         runner = CliRunner()
         result = runner.invoke(main, ["tui", "--help"])
         # The help text should mention the canvas or interactive
-        assert "canvas" in result.output.lower() or "interactive" in result.output.lower() or "tui" in result.output.lower()
+        assert (
+            "canvas" in result.output.lower()
+            or "interactive" in result.output.lower()
+            or "tui" in result.output.lower()
+        )
 
     def test_tui_help_shows_options(self):
         runner = CliRunner()

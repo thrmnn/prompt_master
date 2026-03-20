@@ -1,7 +1,5 @@
 """Tests for DimensionNavigator — cursor-driven state space exploration."""
 
-import pytest
-
 from prompt_master.tui.dimension_nav import DimensionNavigator, DIM_ORDER
 from prompt_master.vibe import DIMENSIONS
 

@@ -1,7 +1,5 @@
 """Tests for keybinding definitions and help text generation."""
 
-import pytest
-
 from prompt_master.tui.keybindings import (
     CONVERSATION_BINDINGS,
     DRAWER_BINDINGS,

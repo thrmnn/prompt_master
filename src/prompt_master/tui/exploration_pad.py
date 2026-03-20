@@ -11,11 +11,9 @@ This is the "synthesizer XY pad for prompts" interaction.
 
 from __future__ import annotations
 
-from typing import Optional
 
 from textual import events
 from textual.app import ComposeResult
-from textual.containers import Vertical
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -77,12 +75,16 @@ class ExplorationPad(Widget):
 
     class MorphRequest(Message):
         """Posted when the cursor crosses into a new zone."""
+
         def __init__(
             self,
             section_name: str,
-            x_dim: str, x_val: str,
-            y_dim: str, y_val: str,
-            x_pct: float, y_pct: float,
+            x_dim: str,
+            x_val: str,
+            y_dim: str,
+            y_val: str,
+            x_pct: float,
+            y_pct: float,
         ) -> None:
             super().__init__()
             self.section_name = section_name
@@ -172,7 +174,9 @@ class ExplorationPad(Widget):
         # X axis label
         x_left = x_vals[0]
         x_right = x_vals[-1]
-        x_label = f"  {x_left}" + " " * (PAD_WIDTH - len(x_left) - len(x_right) - 4) + f"{x_right}  "
+        x_label = (
+            f"  {x_left}" + " " * (PAD_WIDTH - len(x_left) - len(x_right) - 4) + f"{x_right}  "
+        )
         lines.append(f"[bold]{self.x_dim}:[/] {x_label}")
 
         # Grid rows
@@ -240,12 +244,17 @@ class ExplorationPad(Widget):
         if x_val != self._last_x_val or y_val != self._last_y_val:
             self._last_x_val = x_val
             self._last_y_val = y_val
-            self.post_message(self.MorphRequest(
-                section_name=self._section_name,
-                x_dim=self.x_dim, x_val=x_val,
-                y_dim=self.y_dim, y_val=y_val,
-                x_pct=self._cursor_x, y_pct=self._cursor_y,
-            ))
+            self.post_message(
+                self.MorphRequest(
+                    section_name=self._section_name,
+                    x_dim=self.x_dim,
+                    x_val=x_val,
+                    y_dim=self.y_dim,
+                    y_val=y_val,
+                    x_pct=self._cursor_x,
+                    y_pct=self._cursor_y,
+                )
+            )
 
     # ── Event handling ────────────────────────────────────────────────
 

@@ -1,7 +1,5 @@
 """Tests for template loading and management."""
 
-from pathlib import Path
-
 import pytest
 
 from prompt_master.templates import (
@@ -55,9 +53,7 @@ def test_show_missing_template():
 
 
 def test_save_template(tmp_path, tmp_template_dir, monkeypatch):
-    monkeypatch.setattr(
-        "prompt_master.templates.USER_TEMPLATE_DIR", tmp_path / "user_templates"
-    )
+    monkeypatch.setattr("prompt_master.templates.USER_TEMPLATE_DIR", tmp_path / "user_templates")
     source = str(tmp_template_dir / "test.toml")
     dest = save_template("my_template", source)
     assert dest.exists()

@@ -61,6 +61,7 @@ class Canvas(Vertical):
 
     class ExploreSection(Message):
         """User pressed Tab on a section — request variations."""
+
         def __init__(self, section_name: str) -> None:
             super().__init__()
             self.section_name = section_name
@@ -162,7 +163,9 @@ class Canvas(Vertical):
     # ── Whisper ───────────────────────────────────────────────────────
 
     def show_whisper(self, text: str, section: str, priority: int = 0, ttl: float = 6.0) -> None:
-        self.whisper.show_whisper(WhisperData(text=text, section=section, priority=priority, ttl=ttl))
+        self.whisper.show_whisper(
+            WhisperData(text=text, section=section, priority=priority, ttl=ttl)
+        )
 
     def dismiss_whisper(self) -> None:
         self.whisper.dismiss()
@@ -209,7 +212,9 @@ class Canvas(Vertical):
         self.update_section(message.section_name, message.variation_text, highlight=True)
         self.hide_variations()
 
-    def on_dimension_navigator_dimension_changed(self, message: DimensionNavigator.DimensionChanged) -> None:
+    def on_dimension_navigator_dimension_changed(
+        self, message: DimensionNavigator.DimensionChanged
+    ) -> None:
         """Dimension value changed — bubble up for the app to morph the section."""
         pass  # Handled by CanvasApp
 

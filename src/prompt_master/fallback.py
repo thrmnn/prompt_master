@@ -58,7 +58,9 @@ def fallback_optimize(
     sections = []
 
     # Role
-    role = template.get("role", {}).get("default", TARGET_ROLES.get(target, TARGET_ROLES["general"]))
+    role = template.get("role", {}).get(
+        "default", TARGET_ROLES.get(target, TARGET_ROLES["general"])
+    )
     sections.append(f"# Role\n{role}")
 
     # Task

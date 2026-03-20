@@ -1,9 +1,6 @@
 """Tests for realtime section scoring — pure-logic scoring without TUI framework."""
 
-import pytest
-
 from prompt_master.tui.realtime_scorer import (
-    SectionScore,
     compute_overall_score,
     detect_decomposition,
     get_weakness_feedback,
@@ -60,7 +57,10 @@ class TestScoreEmptyRole:
         # Empty role still gets some base points for non-generic (vacuously true),
         # but should score much lower than a good role
         assert scores["Role"].score < 5
-        assert "empty" in scores["Role"].feedback.lower() or "missing" in scores["Role"].feedback.lower()
+        assert (
+            "empty" in scores["Role"].feedback.lower()
+            or "missing" in scores["Role"].feedback.lower()
+        )
 
     def test_whitespace_only_scores_very_low(self):
         sections = {"Role": "   "}

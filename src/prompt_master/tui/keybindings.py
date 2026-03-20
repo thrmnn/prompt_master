@@ -28,6 +28,7 @@ CONVERSATION_BINDINGS = [
     ("escape", "cancel", "Clear input"),
 ]
 
+
 def get_help_text() -> str:
     """Return formatted help text for all bindings."""
     lines = []

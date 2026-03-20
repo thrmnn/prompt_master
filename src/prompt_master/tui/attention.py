@@ -14,17 +14,19 @@ from typing import List, Optional
 
 # ── Thresholds (seconds) ─────────────────────────────────────────────────────
 
-DWELL_THRESHOLD = 0.8       # 800ms  -> DwellEvent
+DWELL_THRESHOLD = 0.8  # 800ms  -> DwellEvent
 DEEP_DWELL_THRESHOLD = 2.5  # 2500ms -> DeepDwellEvent
-BOUNCE_WINDOW = 3.0         # Look back N seconds for bounce detection
-BOUNCE_MIN_SWITCHES = 3     # Minimum section switches within window to count as bounce
+BOUNCE_WINDOW = 3.0  # Look back N seconds for bounce detection
+BOUNCE_MIN_SWITCHES = 3  # Minimum section switches within window to count as bounce
 
 
 # ── Events ───────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class AttentionEvent:
     """Base class for all attention events."""
+
     section: str
     timestamp: float
 
@@ -32,12 +34,14 @@ class AttentionEvent:
 @dataclass
 class DwellEvent(AttentionEvent):
     """Cursor has been on this section for >800ms."""
+
     pass
 
 
 @dataclass
 class DeepDwellEvent(AttentionEvent):
     """Cursor has been on this section for >2500ms."""
+
     pass
 
 
@@ -48,19 +52,23 @@ class BounceEvent(AttentionEvent):
     Fired when the user switches focus between sections rapidly,
     indicating they may be uncertain about how to proceed.
     """
+
     other_section: str = ""
 
 
 # ── Section transition record ────────────────────────────────────────────────
 
+
 @dataclass
 class _SectionVisit:
     """Internal record of a single section visit."""
+
     section: str
     entered_at: float
 
 
 # ── Tracker ──────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class AttentionTracker:

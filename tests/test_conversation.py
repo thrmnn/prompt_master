@@ -1,14 +1,10 @@
 """Tests for conversation engine: phase transitions, marker extraction, stream filtering."""
 
-import pytest
-
 from prompt_master.conversation import (
     FINAL_PROMPT,
     PROMPT_END,
     PROMPT_START,
     ConversationEngine,
-    FilterState,
-    Message,
     Phase,
     StreamFilter,
 )
@@ -37,7 +33,9 @@ class TestStreamFilter:
         output = []
         sf.on_text = output.append
 
-        sf.feed(f"Here is a draft:\n{PROMPT_START}\nDo the thing.\n{PROMPT_END}\nWhat do you think?")
+        sf.feed(
+            f"Here is a draft:\n{PROMPT_START}\nDo the thing.\n{PROMPT_END}\nWhat do you think?"
+        )
         sf.flush()
 
         result = "".join(output)
@@ -116,7 +114,9 @@ class TestStreamFilter:
         sf = StreamFilter()
         sf.on_text = lambda t: None
 
-        sf.feed(f"{PROMPT_START}First draft{PROMPT_END} some text {PROMPT_START}Second draft{PROMPT_END}")
+        sf.feed(
+            f"{PROMPT_START}First draft{PROMPT_END} some text {PROMPT_START}Second draft{PROMPT_END}"
+        )
         sf.flush()
 
         assert sf.draft_content == "Second draft"
@@ -176,15 +176,11 @@ class TestConversationEngine:
     def test_process_response_with_refinement(self):
         engine = ConversationEngine()
         engine.add_user_message("Build a REST API")
-        engine.process_assistant_response(
-            f"{PROMPT_START}First draft{PROMPT_END}"
-        )
+        engine.process_assistant_response(f"{PROMPT_START}First draft{PROMPT_END}")
         assert engine.phase == Phase.DRAFTING
 
         engine.add_user_message("Make it more specific")
-        engine.process_assistant_response(
-            f"{PROMPT_START}Refined draft{PROMPT_END}"
-        )
+        engine.process_assistant_response(f"{PROMPT_START}Refined draft{PROMPT_END}")
         assert engine.phase == Phase.REFINING
         assert engine.current_draft == "Refined draft"
 

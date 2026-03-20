@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
-from typing import Callable, Generator, List, Optional
+from typing import Callable, List, Optional
 
 from prompt_master.prompts import build_system_prompt
 
@@ -23,22 +23,26 @@ _MAX_MARKER_LEN = max(len(m) for m in _ALL_MARKERS)
 
 # ── Conversation phases ─────────────────────────────────────────────────────
 
+
 class Phase(enum.Enum):
     """Conversation phase tracking."""
-    EXPLORING = "exploring"      # Free-form back-and-forth
-    DRAFTING = "drafting"        # A draft has been proposed
-    REFINING = "refining"        # User is refining a draft
-    FINALIZED = "finalized"      # Final prompt extracted
+
+    EXPLORING = "exploring"  # Free-form back-and-forth
+    DRAFTING = "drafting"  # A draft has been proposed
+    REFINING = "refining"  # User is refining a draft
+    FINALIZED = "finalized"  # Final prompt extracted
 
 
 # ── Stream filter state machine ─────────────────────────────────────────────
 
+
 class FilterState(enum.Enum):
     """States for the streaming marker filter."""
+
     PASSTHROUGH = "passthrough"  # Normal text — emit immediately
-    BUFFERING = "buffering"      # Potential marker — accumulate
-    IN_DRAFT = "in_draft"        # Inside PROMPT_START..PROMPT_END
-    IN_FINAL = "in_final"        # Inside FINAL_PROMPT..FINAL_PROMPT
+    BUFFERING = "buffering"  # Potential marker — accumulate
+    IN_DRAFT = "in_draft"  # Inside PROMPT_START..PROMPT_END
+    IN_FINAL = "in_final"  # Inside FINAL_PROMPT..FINAL_PROMPT
 
 
 @dataclass
@@ -175,6 +179,7 @@ class StreamFilter:
 
 # ── Conversation engine ─────────────────────────────────────────────────────
 
+
 @dataclass
 class Message:
     role: str  # "user" or "assistant"
@@ -258,9 +263,7 @@ class ConversationEngine:
 
     def request_finalization(self):
         """Add a user message requesting finalization."""
-        self.add_user_message(
-            "I'm done. Please output the final version of the prompt."
-        )
+        self.add_user_message("I'm done. Please output the final version of the prompt.")
 
     def to_dict(self) -> dict:
         """Serialize for session persistence."""
@@ -282,7 +285,6 @@ class ConversationEngine:
             final_prompt=data.get("final_prompt", ""),
         )
         engine.messages = [
-            Message(role=m["role"], content=m["content"])
-            for m in data.get("messages", [])
+            Message(role=m["role"], content=m["content"]) for m in data.get("messages", [])
         ]
         return engine

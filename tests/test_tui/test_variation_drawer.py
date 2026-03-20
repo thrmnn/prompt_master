@@ -1,13 +1,15 @@
 """Tests for VariationDrawer — catches DuplicateIds and lifecycle bugs."""
 
-import pytest
-
 from prompt_master.tui.variation_drawer import VariationDrawer, _VariationRow, VariationSelected
 
 
 SAMPLE_VARIATIONS = [
     {"dimension": "tone", "value": "formal", "content": "In a formal manner:\nDo the thing."},
-    {"dimension": "audience", "value": "expert", "content": "For experts: Do the thing.\nSkip basics."},
+    {
+        "dimension": "audience",
+        "value": "expert",
+        "content": "For experts: Do the thing.\nSkip basics.",
+    },
     {"dimension": "style", "value": "concise", "content": "Do it."},
 ]
 

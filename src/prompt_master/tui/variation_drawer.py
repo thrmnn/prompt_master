@@ -100,10 +100,12 @@ class VariationDrawer(Container):
     def show_loading(self) -> None:
         """Show loading state."""
         self._clear()
-        self.mount(Static(
-            f"[bold]{self._section_name}[/] — generating variations...",
-            classes="drawer-header",
-        ))
+        self.mount(
+            Static(
+                f"[bold]{self._section_name}[/] — generating variations...",
+                classes="drawer-header",
+            )
+        )
         self.mount(Static("[dim italic]Please wait...[/]"))
         self.add_class("visible")
 
@@ -122,10 +124,12 @@ class VariationDrawer(Container):
     def _mount_rows(self) -> None:
         """Mount variation rows from current _variations list."""
         n = len(self._variations)
-        self.mount(Static(
-            f"[bold]{self._section_name}[/] — {n} variation{'s' if n != 1 else ''}",
-            classes="drawer-header",
-        ))
+        self.mount(
+            Static(
+                f"[bold]{self._section_name}[/] — {n} variation{'s' if n != 1 else ''}",
+                classes="drawer-header",
+            )
+        )
 
         for idx, var in enumerate(self._variations, start=1):
             dim = var.get("dimension", "?")
@@ -136,10 +140,12 @@ class VariationDrawer(Container):
             if len(lines) > 1:
                 preview += f" [dim]...+{len(lines) - 1} lines[/]"
 
-            self.mount(_VariationRow(
-                f"  [bold cyan][{idx}][/]  [yellow]{dim}={val}[/]  {preview}",
-                row_index=idx,
-            ))
+            self.mount(
+                _VariationRow(
+                    f"  [bold cyan][{idx}][/]  [yellow]{dim}={val}[/]  {preview}",
+                    row_index=idx,
+                )
+            )
 
         self.mount(Static("[dim]1-9: pick  |  Esc: close[/]", classes="drawer-hint"))
 
@@ -147,10 +153,12 @@ class VariationDrawer(Container):
         """Select variation at 1-based index."""
         if 1 <= index <= len(self._variations):
             var = self._variations[index - 1]
-            self.post_message(VariationSelected(
-                section_name=self._section_name,
-                variation_text=var.get("content", ""),
-            ))
+            self.post_message(
+                VariationSelected(
+                    section_name=self._section_name,
+                    variation_text=var.get("content", ""),
+                )
+            )
             self.hide()
 
     def on_key(self, event: events.Key) -> None:

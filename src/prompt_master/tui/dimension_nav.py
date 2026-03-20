@@ -76,6 +76,7 @@ class DimensionNavigator(Widget):
 
     class DimensionChanged(Message):
         """Posted when a dimension value changes — section should morph."""
+
         def __init__(self, section_name: str, dimension: str, value: str) -> None:
             super().__init__()
             self.section_name = section_name
@@ -84,6 +85,7 @@ class DimensionNavigator(Widget):
 
     class NavigatorClosed(Message):
         """Posted when the navigator is dismissed."""
+
         def __init__(self, section_name: str) -> None:
             super().__init__()
             self.section_name = section_name
@@ -203,10 +205,12 @@ class DimensionNavigator(Widget):
             self._render_bar()
 
             # Post change event — section morphs in real-time
-            self.post_message(self.DimensionChanged(
-                section_name=self._section_name,
-                dimension=dim,
-                value=values[idx],
-            ))
+            self.post_message(
+                self.DimensionChanged(
+                    section_name=self._section_name,
+                    dimension=dim,
+                    value=values[idx],
+                )
+            )
             event.stop()
             return

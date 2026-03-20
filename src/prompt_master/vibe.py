@@ -114,7 +114,9 @@ class VibeEngine:
         if dimensions:
             dim_instruction = f"Focus on these dimensions: {', '.join(dimensions)}."
         else:
-            dim_instruction = "Choose diverse dimensions to create meaningfully different variations."
+            dim_instruction = (
+                "Choose diverse dimensions to create meaningfully different variations."
+            )
 
         user_message = (
             f"**Base idea:** {self.idea}\n\n"
@@ -196,14 +198,16 @@ class VibeEngine:
         for i in indices:
             if i < len(self.variations):
                 v = self.variations[i]
-                results.append({
-                    "index": i,
-                    "dimension": v.dimension,
-                    "value": v.value,
-                    "preview": v.prompt[:100] + ("..." if len(v.prompt) > 100 else ""),
-                    "length": len(v.prompt),
-                    "parent_id": v.parent_id,
-                })
+                results.append(
+                    {
+                        "index": i,
+                        "dimension": v.dimension,
+                        "value": v.value,
+                        "preview": v.prompt[:100] + ("..." if len(v.prompt) > 100 else ""),
+                        "length": len(v.prompt),
+                        "parent_id": v.parent_id,
+                    }
+                )
         return results
 
     def _fallback_variations(
@@ -222,11 +226,13 @@ class VibeEngine:
             # Apply simple transformations based on dimension
             modified = _apply_dimension(base_prompt, dim, value)
 
-            variations.append(Variation(
-                dimension=dim,
-                value=value,
-                prompt=modified,
-            ))
+            variations.append(
+                Variation(
+                    dimension=dim,
+                    value=value,
+                    prompt=modified,
+                )
+            )
 
         return variations
 
@@ -340,7 +346,7 @@ def _apply_audience(sections: Dict[str, str], value: str) -> Dict[str, str]:
         "beginner": "Use short sentences, numbered steps, and concrete examples for every concept. Include a glossary of key terms at the end.",
         "expert": "Dense, information-rich format. Use bullet points for key insights. Include trade-off tables and decision matrices where relevant.",
         "executive": "Start with a 2-sentence executive summary. Use bullet points for key findings. End with clear recommendations and next steps.",
-        "child": "Use short, fun paragraphs. Include \"Try it!\" activities. Use comparisons to things kids know (games, animals, toys).",
+        "child": 'Use short, fun paragraphs. Include "Try it!" activities. Use comparisons to things kids know (games, animals, toys).',
         "developer": "Include fenced code blocks for all examples. Use inline `code` for technical terms. Structure as a reference guide.",
         "general": "Use clear headings, mix of prose and bullets. Include examples that don't require specialized knowledge.",
     }
@@ -357,7 +363,7 @@ def _apply_format(sections: Dict[str, str], value: str) -> Dict[str, str]:
         "prose": "Write in flowing, connected prose paragraphs. Use transitions between ideas. No bullet points or numbered lists — let the narrative flow naturally.",
         "bullets": "Use bullet points throughout:\n- Main points as top-level bullets\n- Supporting details as nested bullets\n- Each bullet is one clear, self-contained point\n- No prose paragraphs — everything is bulleted",
         "step-by-step": "Structure as a numbered step-by-step guide:\n1. Each step is a single, actionable instruction\n2. Steps are ordered by dependency (do X before Y)\n3. Include expected outcome after each step\n4. Add troubleshooting tips for steps that commonly fail",
-        "code": "Provide working code examples for every concept:\n- Each code block is fenced with the language specified\n- Include inline comments explaining the \"why\"\n- Show both the implementation and a usage example\n- All code must be copy-paste-ready and runnable",
+        "code": 'Provide working code examples for every concept:\n- Each code block is fenced with the language specified\n- Include inline comments explaining the "why"\n- Show both the implementation and a usage example\n- All code must be copy-paste-ready and runnable',
         "dialogue": "Frame the response as a Q&A dialogue:\n- Q: (common question about the topic)\n- A: (clear, direct answer)\n- Follow-up Q: (digging deeper)\n- Use this format to cover all key aspects naturally",
         "report": "Structure as a formal report:\n1. **Executive Summary** — 2-3 sentence overview\n2. **Background** — Context and scope\n3. **Findings** — Detailed analysis with evidence\n4. **Recommendations** — Actionable next steps\n5. **Appendix** — Supporting details and references",
     }
@@ -389,7 +395,7 @@ def _apply_specificity(sections: Dict[str, str], value: str) -> Dict[str, str]:
         "precise": (
             f"Be maximally precise about: {task}\n\n"
             f"Every claim must be specific and verifiable. Use exact numbers, names, "
-            f"and references. Avoid hedging language (\"might\", \"could\", \"generally\"). "
+            f'and references. Avoid hedging language ("might", "could", "generally"). '
             f"If something is uncertain, state the confidence level explicitly."
         ),
     }
@@ -404,14 +410,14 @@ def _apply_style(sections: Dict[str, str], value: str) -> Dict[str, str]:
         "concise": "You are a precise communicator. Every word earns its place. Cut ruthlessly — if a sentence doesn't add value, delete it.",
         "verbose": "You are a thorough expert who leaves nothing unexplained. Cover every angle, provide detailed examples, and anticipate follow-up questions.",
         "academic": "You are a scholarly researcher. Use formal academic language, cite established frameworks, and structure arguments with clear thesis/evidence/conclusion patterns.",
-        "conversational": "You're a knowledgeable colleague having an informal discussion. Use \"you\" and \"we\". Share anecdotes. Be direct but warm.",
+        "conversational": 'You\'re a knowledgeable colleague having an informal discussion. Use "you" and "we". Share anecdotes. Be direct but warm.',
         "poetic": "You are an eloquent communicator who finds beauty in ideas. Use vivid imagery, metaphors, and rhythmic language to make concepts memorable.",
     }
     style_constraints = {
         "concise": "Maximum 3 sentences per section. No filler words. No restating what was already said. If you can say it in 5 words, don't use 10.",
         "verbose": "Provide thorough explanations for every point. Include multiple examples. Anticipate and address potential questions. Leave no concept unexplained.",
         "academic": "Use formal language. Reference established methodologies. Structure as: claim → evidence → analysis. Include a conclusion that synthesizes findings.",
-        "conversational": "Write like you're talking to a friend. Use contractions. Ask rhetorical questions. Share the \"why\" behind recommendations, not just the \"what\".",
+        "conversational": 'Write like you\'re talking to a friend. Use contractions. Ask rhetorical questions. Share the "why" behind recommendations, not just the "what".',
         "poetic": "Paint pictures with words. Use metaphors to illuminate complex ideas. Let rhythm and cadence carry the reader through the response.",
     }
     if value in style_roles:

@@ -201,9 +201,7 @@ class TestVibeCLI:
 
     def test_vibe_no_api(self):
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["vibe", "build an api", "-t", "code", "--no-api", "-n", "3"]
-        )
+        result = runner.invoke(main, ["vibe", "build an api", "-t", "code", "--no-api", "-n", "3"])
         assert result.exit_code == 0
         assert "Variation 1" in result.output
         assert "Variation 2" in result.output
@@ -219,9 +217,7 @@ class TestVibeCLI:
 
     def test_vibe_invalid_dimension(self):
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["vibe", "test", "--no-api", "-d", "bogus"]
-        )
+        result = runner.invoke(main, ["vibe", "test", "--no-api", "-d", "bogus"])
         assert result.exit_code != 0
 
     def test_vibe_output_to_file(self, tmp_path):
@@ -244,8 +240,6 @@ class TestVibeCLI:
 
     def test_vibe_default_count_is_4(self):
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["vibe", "test idea for vibes", "--no-api"]
-        )
+        result = runner.invoke(main, ["vibe", "test idea for vibes", "--no-api"])
         assert result.exit_code == 0
         assert "Variation 4" in result.output

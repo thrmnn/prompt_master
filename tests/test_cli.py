@@ -22,9 +22,7 @@ def test_optimize_quick_no_api():
 
 def test_optimize_code_target_no_api():
     runner = CliRunner()
-    result = runner.invoke(
-        main, ["optimize", "sort a list", "-t", "code", "--no-api"]
-    )
+    result = runner.invoke(main, ["optimize", "sort a list", "-t", "code", "--no-api"])
     assert result.exit_code == 0
     assert "code" in result.output.lower() or "engineer" in result.output.lower()
 
@@ -32,9 +30,7 @@ def test_optimize_code_target_no_api():
 def test_optimize_output_to_file(tmp_path):
     runner = CliRunner()
     out_file = str(tmp_path / "prompt.md")
-    result = runner.invoke(
-        main, ["optimize", "build a todo app", "--no-api", "-o", out_file]
-    )
+    result = runner.invoke(main, ["optimize", "build a todo app", "--no-api", "-o", out_file])
     assert result.exit_code == 0
     content = (tmp_path / "prompt.md").read_text()
     assert "todo app" in content

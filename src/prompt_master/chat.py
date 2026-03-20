@@ -54,9 +54,7 @@ def run_chat(
     try:
         client = ClaudeClient(model=model)
     except NoAPIKeyError:
-        show_error(
-            "No API key found. Set ANTHROPIC_API_KEY to use chat mode."
-        )
+        show_error("No API key found. Set ANTHROPIC_API_KEY to use chat mode.")
         return
 
     show_banner(engine.target, session_id)
@@ -125,9 +123,7 @@ def run_chat(
 
         if output:
             Path(output).write_text(final)
-            click.echo(
-                click.style(f"  Prompt saved to {output}", dim=True)
-            )
+            click.echo(click.style(f"  Prompt saved to {output}", dim=True))
 
         # Auto-save session
         save_session(session_id, engine)

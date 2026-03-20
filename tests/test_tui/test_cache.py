@@ -1,7 +1,5 @@
 """Tests for LRUCache — eviction, access refresh, and content keys."""
 
-import pytest
-
 from prompt_master.tui.cache import LRUCache
 
 

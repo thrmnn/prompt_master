@@ -10,7 +10,11 @@ QUESTIONS = [
     ("tone", "What tone and style? (formal/casual/technical/etc.)", ["creative"]),
     ("evidence", "What data sources should be referenced?", ["analysis"]),
     ("agents", "What specialized agents or roles are needed?", ["workflow"]),
-    ("orchestration", "Preferred orchestration pattern? (fan-out/fan-in/pipeline/router/hierarchical)", ["workflow"]),
+    (
+        "orchestration",
+        "Preferred orchestration pattern? (fan-out/fan-in/pipeline/router/hierarchical)",
+        ["workflow"],
+    ),
     ("tools", "What tools or APIs should agents have access to?", ["workflow"]),
     ("example", "Example of good output? (optional, Enter to skip)", ["all"]),
 ]
@@ -18,7 +22,7 @@ QUESTIONS = [
 
 def run_interactive(idea: str, target: str) -> dict:
     """Prompt user with clarifying questions. Return dict of answers."""
-    click.echo(f"\nLet me ask a few questions to optimize your prompt.\n")
+    click.echo("\nLet me ask a few questions to optimize your prompt.\n")
     click.echo(f"  Your idea: {idea}\n")
 
     clarifications = {}

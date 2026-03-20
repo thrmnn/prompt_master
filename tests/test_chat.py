@@ -1,7 +1,6 @@
 """CLI integration tests for the chat command."""
 
-import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
@@ -46,9 +45,7 @@ class TestChatCommand:
 
         assert "Error" in result.output or "error" in result.output.lower()
 
-    def test_chat_with_idea_and_done(
-        self, cli_runner, mock_claude_client, sessions_dir
-    ):
+    def test_chat_with_idea_and_done(self, cli_runner, mock_claude_client, sessions_dir):
         """Full flow: idea → response → /done → final prompt."""
         responses = iter(
             [
@@ -65,93 +62,61 @@ class TestChatCommand:
 
         mock_claude_client.converse_stream.side_effect = stream_side_effect
 
-        result = cli_runner.invoke(
-            main, ["chat", "build something cool"], input="/done\n"
-        )
+        result = cli_runner.invoke(main, ["chat", "build something cool"], input="/done\n")
 
         assert result.exit_code == 0
         assert mock_claude_client.converse_stream.call_count == 2
 
-    def test_chat_quit_saves_session(
-        self, cli_runner, mock_claude_client, sessions_dir
-    ):
+    def test_chat_quit_saves_session(self, cli_runner, mock_claude_client, sessions_dir):
         """Quitting saves the session."""
-        mock_claude_client.converse_stream.return_value = iter(
-            ["Interesting! Tell me more."]
-        )
+        mock_claude_client.converse_stream.return_value = iter(["Interesting! Tell me more."])
 
-        result = cli_runner.invoke(
-            main, ["chat", "my idea"], input="/quit\n"
-        )
+        result = cli_runner.invoke(main, ["chat", "my idea"], input="/quit\n")
 
         assert result.exit_code == 0
         # Session file should exist
         session_files = list(sessions_dir.glob("*.json"))
         assert len(session_files) == 1
 
-    def test_chat_save_command(
-        self, cli_runner, mock_claude_client, sessions_dir
-    ):
+    def test_chat_save_command(self, cli_runner, mock_claude_client, sessions_dir):
         """/save saves the session mid-conversation."""
-        mock_claude_client.converse_stream.return_value = iter(
-            ["Let's work on this."]
-        )
+        mock_claude_client.converse_stream.return_value = iter(["Let's work on this."])
 
-        result = cli_runner.invoke(
-            main, ["chat", "my idea"], input="/save\n/quit\n"
-        )
+        result = cli_runner.invoke(main, ["chat", "my idea"], input="/save\n/quit\n")
 
         assert result.exit_code == 0
         assert "Session saved" in result.output or "session saved" in result.output.lower()
 
-    def test_chat_help_command(
-        self, cli_runner, mock_claude_client, sessions_dir
-    ):
+    def test_chat_help_command(self, cli_runner, mock_claude_client, sessions_dir):
         """/help shows commands."""
-        mock_claude_client.converse_stream.return_value = iter(
-            ["What shall we build?"]
-        )
+        mock_claude_client.converse_stream.return_value = iter(["What shall we build?"])
 
-        result = cli_runner.invoke(
-            main, ["chat", "my idea"], input="/help\n/quit\n"
-        )
+        result = cli_runner.invoke(main, ["chat", "my idea"], input="/help\n/quit\n")
 
         assert result.exit_code == 0
         assert "/done" in result.output
         assert "/save" in result.output
 
-    def test_chat_draft_command_no_draft(
-        self, cli_runner, mock_claude_client, sessions_dir
-    ):
+    def test_chat_draft_command_no_draft(self, cli_runner, mock_claude_client, sessions_dir):
         """/draft with no draft yet shows message."""
-        mock_claude_client.converse_stream.return_value = iter(
-            ["Tell me more about your idea."]
-        )
+        mock_claude_client.converse_stream.return_value = iter(["Tell me more about your idea."])
 
-        result = cli_runner.invoke(
-            main, ["chat", "idea"], input="/draft\n/quit\n"
-        )
+        result = cli_runner.invoke(main, ["chat", "idea"], input="/draft\n/quit\n")
 
         assert result.exit_code == 0
         assert "No draft yet" in result.output or "no draft" in result.output.lower()
 
     def test_chat_target_option(self, cli_runner, mock_claude_client, sessions_dir):
         """Target option is passed to the engine."""
-        mock_claude_client.converse_stream.return_value = iter(
-            ["What language?"]
-        )
+        mock_claude_client.converse_stream.return_value = iter(["What language?"])
 
-        result = cli_runner.invoke(
-            main, ["chat", "build a CLI", "-t", "code"], input="/quit\n"
-        )
+        result = cli_runner.invoke(main, ["chat", "build a CLI", "-t", "code"], input="/quit\n")
 
         assert result.exit_code == 0
         # Verify target appears in banner
         assert "code" in result.output.lower()
 
-    def test_chat_output_file(
-        self, cli_runner, mock_claude_client, sessions_dir, tmp_path
-    ):
+    def test_chat_output_file(self, cli_runner, mock_claude_client, sessions_dir, tmp_path):
         """Output file receives the final prompt."""
         outfile = tmp_path / "result.md"
 
@@ -161,9 +126,7 @@ class TestChatCommand:
                 f"{FINAL_PROMPT}\nFinal output here.\n{FINAL_PROMPT}",
             ]
         )
-        mock_claude_client.converse_stream.side_effect = lambda **kw: iter(
-            [next(responses)]
-        )
+        mock_claude_client.converse_stream.side_effect = lambda **kw: iter([next(responses)])
 
         result = cli_runner.invoke(
             main,
@@ -178,19 +141,13 @@ class TestChatCommand:
     def test_chat_resume_nonexistent(self, cli_runner, sessions_dir):
         """Resuming a nonexistent session shows error."""
         with patch("prompt_master.chat.ClaudeClient"):
-            result = cli_runner.invoke(
-                main, ["chat", "--resume", "nonexistent"]
-            )
+            result = cli_runner.invoke(main, ["chat", "--resume", "nonexistent"])
 
         assert "error" in result.output.lower() or "Error" in result.output
 
-    def test_chat_open_ended_no_idea(
-        self, cli_runner, mock_claude_client, sessions_dir
-    ):
+    def test_chat_open_ended_no_idea(self, cli_runner, mock_claude_client, sessions_dir):
         """Chat can start without an initial idea."""
-        result = cli_runner.invoke(
-            main, ["chat", "-t", "code"], input="/quit\n"
-        )
+        result = cli_runner.invoke(main, ["chat", "-t", "code"], input="/quit\n")
 
         assert result.exit_code == 0
         # Should not have called the API (no initial idea, quit immediately)

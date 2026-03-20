@@ -5,7 +5,6 @@ import time
 import pytest
 
 from prompt_master.tui.attention import (
-    AttentionEvent,
     AttentionTracker,
     BounceEvent,
     BOUNCE_MIN_SWITCHES,
@@ -19,6 +18,7 @@ from prompt_master.tui.attention import (
 # ---------------------------------------------------------------------------
 # Helpers — simulate the passage of time via monkeypatch
 # ---------------------------------------------------------------------------
+
 
 class FakeClock:
     """Deterministic clock for testing time-dependent logic."""
@@ -99,7 +99,8 @@ class TestDeepDwellEvent:
         clock.advance(DEEP_DWELL_THRESHOLD + 0.1)
         events = tracker.tick()
         # Both dwell and deep dwell should fire if neither has been emitted yet
-        dwell_events = [e for e in events if isinstance(e, DwellEvent) and not isinstance(e, DeepDwellEvent)]
+        # Verify dwell events are also present (not asserted, just confirming both types fire)
+        assert any(isinstance(e, DwellEvent) and not isinstance(e, DeepDwellEvent) for e in events)
         deep_events = [e for e in events if isinstance(e, DeepDwellEvent)]
         assert len(deep_events) == 1
         assert deep_events[0].section == "Task"
@@ -128,7 +129,9 @@ class TestDwellNotReEmitted:
         # Subsequent ticks should NOT re-emit DwellEvent
         clock.advance(0.2)
         events_2 = tracker.tick()
-        dwell_events = [e for e in events_2 if isinstance(e, DwellEvent) and not isinstance(e, DeepDwellEvent)]
+        dwell_events = [
+            e for e in events_2 if isinstance(e, DwellEvent) and not isinstance(e, DeepDwellEvent)
+        ]
         assert dwell_events == []
 
     def test_deep_dwell_fires_only_once(self, tracker, clock):

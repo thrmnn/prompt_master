@@ -72,8 +72,7 @@ class TestInitialState:
 class TestOnSectionChanged:
     def test_scores_updated_after_section_change(self, worker):
         worker.on_section_changed(
-            "Role",
-            "You are an expert data scientist with deep ML knowledge."
+            "Role", "You are an expert data scientist with deep ML knowledge."
         )
         scores = worker.state.section_scores
         # After processing, we should have a score for Role
@@ -182,7 +181,9 @@ class TestCachedVariations:
         content = "You are a helpful assistant."
         worker.on_section_changed("Role", content)
         cache_key = worker._cache.content_key("Role", content)
-        worker._cache.put(cache_key, [{"dimension": "tone", "value": "formal", "content": "Expert."}])
+        worker._cache.put(
+            cache_key, [{"dimension": "tone", "value": "formal", "content": "Expert."}]
+        )
         worker.on_deep_dwell("Role")
         variations = worker.state.cached_variations.get("Role", [])
         assert isinstance(variations, list)

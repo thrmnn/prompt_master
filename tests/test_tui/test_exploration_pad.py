@@ -1,8 +1,6 @@
 """Tests for ExplorationPad — 2D latent space exploration."""
 
-import pytest
-
-from prompt_master.tui.exploration_pad import ExplorationPad, AXIS_PAIRS, PAD_WIDTH, PAD_HEIGHT
+from prompt_master.tui.exploration_pad import ExplorationPad, AXIS_PAIRS
 from prompt_master.vibe import DIMENSIONS
 
 
@@ -73,9 +71,12 @@ class TestExplorationPadLogic:
     def test_morph_request_message(self):
         msg = ExplorationPad.MorphRequest(
             section_name="Role",
-            x_dim="tone", x_val="formal",
-            y_dim="specificity", y_val="narrow",
-            x_pct=0.8, y_pct=0.3,
+            x_dim="tone",
+            x_val="formal",
+            y_dim="specificity",
+            y_val="narrow",
+            x_pct=0.8,
+            y_pct=0.3,
         )
         assert msg.section_name == "Role"
         assert msg.x_dim == "tone"

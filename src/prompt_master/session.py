@@ -6,7 +6,6 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from prompt_master.conversation import ConversationEngine
 
@@ -52,9 +51,7 @@ def load_session(session_id: str) -> tuple[str, ConversationEngine]:
         return _load_file(matches[0])
     elif len(matches) > 1:
         ids = [m.stem[:8] for m in matches]
-        raise FileNotFoundError(
-            f"Ambiguous session ID '{session_id}'. Matches: {', '.join(ids)}"
-        )
+        raise FileNotFoundError(f"Ambiguous session ID '{session_id}'. Matches: {', '.join(ids)}")
     else:
         raise FileNotFoundError(f"No session found matching '{session_id}'")
 
@@ -80,14 +77,16 @@ def list_sessions() -> list[dict]:
                 if m["role"] == "user":
                     preview = m["content"][:80]
                     break
-            sessions.append({
-                "session_id": data["session_id"],
-                "created_at": data.get("created_at", ""),
-                "target": engine_data.get("target", "general"),
-                "phase": engine_data.get("phase", "exploring"),
-                "message_count": len(messages),
-                "preview": preview,
-            })
+            sessions.append(
+                {
+                    "session_id": data["session_id"],
+                    "created_at": data.get("created_at", ""),
+                    "target": engine_data.get("target", "general"),
+                    "phase": engine_data.get("phase", "exploring"),
+                    "message_count": len(messages),
+                    "preview": preview,
+                }
+            )
         except (json.JSONDecodeError, KeyError):
             continue
     return sessions

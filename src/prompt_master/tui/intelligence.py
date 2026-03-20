@@ -12,7 +12,6 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from prompt_master.tui.attention import DwellEvent, DeepDwellEvent
 from prompt_master.tui.cache import LRUCache
 from prompt_master.tui.realtime_scorer import (
     SectionScore,
@@ -24,6 +23,7 @@ from prompt_master.tui.realtime_scorer import (
 
 
 # ── Data structures ──────────────────────────────────────────────────────────
+
 
 @dataclass
 class Whisper:
@@ -39,10 +39,11 @@ class Whisper:
         whisper_type: Category -- one of "score", "improvement", "coherence",
                       "decomposition", "variations_ready".
     """
+
     text: str
     section: str
-    priority: int        # 0=low, 1=medium, 2=high
-    whisper_type: str    # "score", "improvement", "coherence", "decomposition", "variations_ready"
+    priority: int  # 0=low, 1=medium, 2=high
+    whisper_type: str  # "score", "improvement", "coherence", "decomposition", "variations_ready"
 
     def __repr__(self) -> str:
         prio = ["low", "medium", "high"][min(self.priority, 2)]
@@ -57,6 +58,7 @@ class IntelligenceState:
     cached variations, and pending whispers. Both the TUI and the worker
     read/write this structure.
     """
+
     prompt_sections: Dict[str, str] = field(default_factory=dict)
     section_scores: Dict[str, SectionScore] = field(default_factory=dict)
     overall_score: float = 0.0
@@ -69,6 +71,7 @@ class IntelligenceState:
 
 
 # ── Coherence checking ───────────────────────────────────────────────────────
+
 
 def _check_coherence(sections: Dict[str, str]) -> List[Whisper]:
     """Check for cross-section coherence issues.
@@ -94,24 +97,28 @@ def _check_coherence(sections: Dict[str, str]) -> List[Whisper]:
     task_is_creative = any(s in task for s in creative_task_signals)
 
     if role_is_code and task_is_creative:
-        whispers.append(Whisper(
-            text="Role is code-focused but task is creative -- consider aligning them.",
-            section="Role",
-            priority=1,
-            whisper_type="coherence",
-        ))
+        whispers.append(
+            Whisper(
+                text="Role is code-focused but task is creative -- consider aligning them.",
+                section="Role",
+                priority=1,
+                whisper_type="coherence",
+            )
+        )
 
     # Format says "code" but task is clearly non-code
     format_wants_code = any(s in fmt for s in ["code block", "fenced", "```", "implementation"])
     task_wants_prose = any(s in task for s in ["essay", "article", "blog post", "letter"])
 
     if format_wants_code and task_wants_prose:
-        whispers.append(Whisper(
-            text="Output format specifies code but task requests prose -- double-check alignment.",
-            section="Output Format",
-            priority=1,
-            whisper_type="coherence",
-        ))
+        whispers.append(
+            Whisper(
+                text="Output format specifies code but task requests prose -- double-check alignment.",
+                section="Output Format",
+                priority=1,
+                whisper_type="coherence",
+            )
+        )
 
     # Role is creative but format is highly structured/technical
     creative_role_signals = ["creative writer", "novelist", "poet", "storyteller"]
@@ -121,17 +128,20 @@ def _check_coherence(sections: Dict[str, str]) -> List[Whisper]:
     format_is_structured = any(s in fmt for s in structured_format_signals)
 
     if role_is_creative and format_is_structured:
-        whispers.append(Whisper(
-            text="Creative role paired with highly structured output format -- intentional?",
-            section="Output Format",
-            priority=0,
-            whisper_type="coherence",
-        ))
+        whispers.append(
+            Whisper(
+                text="Creative role paired with highly structured output format -- intentional?",
+                section="Output Format",
+                priority=0,
+                whisper_type="coherence",
+            )
+        )
 
     return whispers
 
 
 # ── Intelligence Worker ──────────────────────────────────────────────────────
+
 
 class IntelligenceWorker:
     """Background worker that watches prompt state and produces recommendations.
@@ -199,14 +209,16 @@ class IntelligenceWorker:
             # Extract section name from the suggestion format "[Section] ..."
             whisper_section = section  # default to the changed section
             if suggestion.startswith("[") and "]" in suggestion:
-                whisper_section = suggestion[1:suggestion.index("]")]
+                whisper_section = suggestion[1 : suggestion.index("]")]
 
-            self.state.pending_whispers.append(Whisper(
-                text=suggestion,
-                section=whisper_section,
-                priority=1,
-                whisper_type="improvement",
-            ))
+            self.state.pending_whispers.append(
+                Whisper(
+                    text=suggestion,
+                    section=whisper_section,
+                    priority=1,
+                    whisper_type="improvement",
+                )
+            )
 
         # 3. Cross-section coherence
         coherence_whispers = _check_coherence(self.state.prompt_sections)
@@ -218,12 +230,14 @@ class IntelligenceWorker:
             suggestion = detect_decomposition(content)
             if suggestion and suggestion != self._last_decomposition_check:
                 self._last_decomposition_check = suggestion
-                self.state.pending_whispers.append(Whisper(
-                    text=suggestion,
-                    section="Task",
-                    priority=2,
-                    whisper_type="decomposition",
-                ))
+                self.state.pending_whispers.append(
+                    Whisper(
+                        text=suggestion,
+                        section="Task",
+                        priority=2,
+                        whisper_type="decomposition",
+                    )
+                )
 
         # Invalidate cached variations for this section
         cache_key = self._cache.content_key(section, content)
@@ -242,12 +256,14 @@ class IntelligenceWorker:
         ss = self.state.section_scores.get(section)
         if ss is not None:
             priority = 2 if ss.score < 4.0 else (1 if ss.score < 7.0 else 0)
-            self.state.pending_whispers.append(Whisper(
-                text=f"{section}: {ss.score:.0f}/10 -- {ss.feedback}",
-                section=section,
-                priority=priority,
-                whisper_type="score",
-            ))
+            self.state.pending_whispers.append(
+                Whisper(
+                    text=f"{section}: {ss.score:.0f}/10 -- {ss.feedback}",
+                    section=section,
+                    priority=priority,
+                    whisper_type="score",
+                )
+            )
 
     def on_deep_dwell(self, section: str) -> None:
         """Called on DeepDwellEvent (~2500ms focus). Pre-generates variations.
@@ -269,12 +285,14 @@ class IntelligenceWorker:
         cached = self._cache.get(cache_key)
         if cached is not None:
             self.state.cached_variations[section] = cached
-            self.state.pending_whispers.append(Whisper(
-                text=f"Variations ready for {section} (cached).",
-                section=section,
-                priority=0,
-                whisper_type="variations_ready",
-            ))
+            self.state.pending_whispers.append(
+                Whisper(
+                    text=f"Variations ready for {section} (cached).",
+                    section=section,
+                    priority=0,
+                    whisper_type="variations_ready",
+                )
+            )
             return
 
         # If no client or budget exhausted, skip API call
@@ -285,12 +303,14 @@ class IntelligenceWorker:
 
         # Mark that we'd like to generate variations (async generation
         # would be triggered by the TUI layer calling generate_variations_async)
-        self.state.pending_whispers.append(Whisper(
-            text=f"Dwelling on {section} -- variations will be pre-generated.",
-            section=section,
-            priority=0,
-            whisper_type="variations_ready",
-        ))
+        self.state.pending_whispers.append(
+            Whisper(
+                text=f"Dwelling on {section} -- variations will be pre-generated.",
+                section=section,
+                priority=0,
+                whisper_type="variations_ready",
+            )
+        )
 
     async def generate_variations_async(self, section: str) -> Optional[List[str]]:
         """Asynchronously generate variations for a section via the API.
@@ -319,6 +339,7 @@ class IntelligenceWorker:
         # Run the blocking API call in a thread pool
         try:
             from prompt_master.optimizer import META_SYSTEM_PROMPT
+
             user_msg = (
                 f"Generate 3 alternative versions of this '{section}' section. "
                 f"Each should be meaningfully different.\n\n"
@@ -338,12 +359,14 @@ class IntelligenceWorker:
             self._cache.put(cache_key, variations)
             self.state.cached_variations[section] = variations
 
-            self.state.pending_whispers.append(Whisper(
-                text=f"{len(variations)} variation(s) ready for {section}.",
-                section=section,
-                priority=1,
-                whisper_type="variations_ready",
-            ))
+            self.state.pending_whispers.append(
+                Whisper(
+                    text=f"{len(variations)} variation(s) ready for {section}.",
+                    section=section,
+                    priority=1,
+                    whisper_type="variations_ready",
+                )
+            )
 
             return variations
 

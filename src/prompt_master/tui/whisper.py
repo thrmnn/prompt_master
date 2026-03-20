@@ -8,7 +8,7 @@ the most relevant whisper at any moment.
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from textual.timer import Timer
@@ -18,6 +18,7 @@ from textual.widgets import Static
 # ---------------------------------------------------------------------------
 # Data
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class WhisperData:
@@ -32,6 +33,7 @@ class WhisperData:
 # ---------------------------------------------------------------------------
 # WhisperOverlay widget
 # ---------------------------------------------------------------------------
+
 
 class WhisperOverlay(Static):
     """Floating contextual hint near the cursor. Dim, non-intrusive."""
@@ -92,6 +94,7 @@ class WhisperOverlay(Static):
 # ---------------------------------------------------------------------------
 # WhisperQueue — priority queue with deduplication
 # ---------------------------------------------------------------------------
+
 
 class WhisperQueue:
     """Manages whisper priority and deduplication.

@@ -14,12 +14,14 @@ from typing import Dict, List, Optional
 
 # ── Score dataclass ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class SectionScore:
     """Scoring result for a single prompt section."""
+
     section: str
-    score: float   # 0-10
-    feedback: str   # one-line explanation
+    score: float  # 0-10
+    feedback: str  # one-line explanation
 
     def __repr__(self) -> str:
         return f"SectionScore({self.section!r}, {self.score}/10, {self.feedback!r})"
@@ -28,45 +30,132 @@ class SectionScore:
 # ── Vague / generic patterns ────────────────────────────────────────────────
 
 _VAGUE_PHRASES = [
-    "do the thing", "make it good", "be helpful", "as needed",
-    "do whatever", "just do it", "some kind of", "figure it out",
-    "be nice", "do your best", "whatever works",
+    "do the thing",
+    "make it good",
+    "be helpful",
+    "as needed",
+    "do whatever",
+    "just do it",
+    "some kind of",
+    "figure it out",
+    "be nice",
+    "do your best",
+    "whatever works",
 ]
 
 _GENERIC_ROLES = [
-    "helpful assistant", "helpful ai", "ai assistant",
-    "language model", "chatbot",
+    "helpful assistant",
+    "helpful ai",
+    "ai assistant",
+    "language model",
+    "chatbot",
 ]
 
 _ACTION_VERBS = [
-    "analyze", "build", "calculate", "classify", "compare", "compose",
-    "convert", "create", "debug", "define", "deploy", "describe", "design",
-    "develop", "diagnose", "edit", "evaluate", "explain", "extract",
-    "format", "generate", "identify", "implement", "integrate", "list",
-    "migrate", "optimize", "outline", "parse", "plan", "prioritize",
-    "provide", "rank", "recommend", "refactor", "review", "rewrite",
-    "search", "simplify", "solve", "structure", "suggest", "summarize",
-    "test", "trace", "transform", "translate", "troubleshoot", "validate",
-    "verify", "visualize", "write",
+    "analyze",
+    "build",
+    "calculate",
+    "classify",
+    "compare",
+    "compose",
+    "convert",
+    "create",
+    "debug",
+    "define",
+    "deploy",
+    "describe",
+    "design",
+    "develop",
+    "diagnose",
+    "edit",
+    "evaluate",
+    "explain",
+    "extract",
+    "format",
+    "generate",
+    "identify",
+    "implement",
+    "integrate",
+    "list",
+    "migrate",
+    "optimize",
+    "outline",
+    "parse",
+    "plan",
+    "prioritize",
+    "provide",
+    "rank",
+    "recommend",
+    "refactor",
+    "review",
+    "rewrite",
+    "search",
+    "simplify",
+    "solve",
+    "structure",
+    "suggest",
+    "summarize",
+    "test",
+    "trace",
+    "transform",
+    "translate",
+    "troubleshoot",
+    "validate",
+    "verify",
+    "visualize",
+    "write",
 ]
 
 _FORMAT_KEYWORDS = [
-    "bullet", "numbered", "heading", "section", "table", "code block",
-    "fenced", "json", "yaml", "xml", "markdown", "list", "paragraph",
-    "step-by-step", "step by step", "report", "outline", "diagram",
-    "csv", "checklist",
+    "bullet",
+    "numbered",
+    "heading",
+    "section",
+    "table",
+    "code block",
+    "fenced",
+    "json",
+    "yaml",
+    "xml",
+    "markdown",
+    "list",
+    "paragraph",
+    "step-by-step",
+    "step by step",
+    "report",
+    "outline",
+    "diagram",
+    "csv",
+    "checklist",
 ]
 
 _DECOMPOSITION_SIGNALS = [
-    "pipeline", "workflow", "step 1", "step 2", "step 3",
-    "then", "after that", "followed by", "next,", "finally,",
-    "multiple stages", "stages", "agents", "multi-agent",
-    "first,", "second,", "third,",
-    "phase 1", "phase 2", "sequentially", "in parallel",
+    "pipeline",
+    "workflow",
+    "step 1",
+    "step 2",
+    "step 3",
+    "then",
+    "after that",
+    "followed by",
+    "next,",
+    "finally,",
+    "multiple stages",
+    "stages",
+    "agents",
+    "multi-agent",
+    "first,",
+    "second,",
+    "third,",
+    "phase 1",
+    "phase 2",
+    "sequentially",
+    "in parallel",
 ]
 
 
 # ── Section scorers ─────────────────────────────────────────────────────────
+
 
 def _score_role(content: str) -> SectionScore:
     """Score the Role section."""
@@ -97,8 +186,18 @@ def _score_role(content: str) -> SectionScore:
         score += 3.0
 
     # Bonus: domain/expertise keywords
-    expertise_words = ["expert", "specialist", "senior", "skilled", "experienced",
-                       "professional", "architect", "engineer", "analyst", "researcher"]
+    expertise_words = [
+        "expert",
+        "specialist",
+        "senior",
+        "skilled",
+        "experienced",
+        "professional",
+        "architect",
+        "engineer",
+        "analyst",
+        "researcher",
+    ]
     if any(w in lower for w in expertise_words):
         score += 2.0
     else:
@@ -160,7 +259,9 @@ def _score_output_format(content: str) -> SectionScore:
     issues: List[str] = []
 
     if not content.strip():
-        return SectionScore(section="Output Format", score=0.0, feedback="missing output format section")
+        return SectionScore(
+            section="Output Format", score=0.0, feedback="missing output format section"
+        )
 
     # Present
     score += 2.0
@@ -201,15 +302,15 @@ def _score_requirements(content: str) -> SectionScore:
     issues: List[str] = []
 
     if not content.strip():
-        return SectionScore(section="Requirements", score=0.0, feedback="missing requirements section")
+        return SectionScore(
+            section="Requirements", score=0.0, feedback="missing requirements section"
+        )
 
     # Present
     score += 2.0
 
     # Has concrete constraints (not just "be good")
-    vague_only = all(
-        v in lower for v in ["good", "nice", "best"]
-    ) and len(content) < 30
+    vague_only = all(v in lower for v in ["good", "nice", "best"]) and len(content) < 30
     if not vague_only:
         score += 2.0
     else:
@@ -271,9 +372,21 @@ def _score_context(content: str) -> SectionScore:
 
     # Mentions audience, constraints, or domain
     lower = content.lower()
-    context_signals = ["audience", "user", "reader", "customer", "domain",
-                       "constraint", "requirement", "scope", "background",
-                       "environment", "platform", "framework", "language"]
+    context_signals = [
+        "audience",
+        "user",
+        "reader",
+        "customer",
+        "domain",
+        "constraint",
+        "requirement",
+        "scope",
+        "background",
+        "environment",
+        "platform",
+        "framework",
+        "language",
+    ]
     signal_hits = sum(1 for s in context_signals if s in lower)
     if signal_hits >= 2:
         score += 1.0
@@ -288,7 +401,9 @@ def _score_context(content: str) -> SectionScore:
 def _score_example(content: str) -> SectionScore:
     """Score the Example section (bonus section)."""
     if not content.strip():
-        return SectionScore(section="Example", score=0.0, feedback="no example provided (optional but helpful)")
+        return SectionScore(
+            section="Example", score=0.0, feedback="no example provided (optional but helpful)"
+        )
 
     score = 5.0  # Generous base for including an example at all
     issues: List[str] = []
@@ -339,6 +454,7 @@ _SECTION_WEIGHTS = {
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
+
 
 def score_sections(sections: Dict[str, str], target: str = "general") -> Dict[str, SectionScore]:
     """Score individual sections of a prompt.
