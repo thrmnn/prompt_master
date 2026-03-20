@@ -9,7 +9,7 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
-BUILTIN_TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
+BUILTIN_TEMPLATE_DIR = Path(__file__).parent / "templates"
 USER_TEMPLATE_DIR = Path.home() / ".prompt_master" / "templates"
 
 

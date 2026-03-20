@@ -1,7 +1,5 @@
 """Tests for the benchmarking system."""
 
-import json
-
 import pytest
 
 from benchmarks.runner import load_cases, generate_prompts, run_benchmark
@@ -164,8 +162,11 @@ class TestJudgeParsing:
     def test_judge_result_avg_score(self):
         jr = JudgeResult(
             case_id="t",
-            clarity=4, completeness=3,
-            intent_preservation=5, domain_fit=4, structure=3,
+            clarity=4,
+            completeness=3,
+            intent_preservation=5,
+            domain_fit=4,
+            structure=3,
         )
         assert jr.avg_score == pytest.approx(3.8)
 
