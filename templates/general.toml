@@ -1,0 +1,14 @@
+[meta]
+name = "general"
+description = "General-purpose LLM prompt template"
+
+[role]
+default = "You are a knowledgeable and helpful assistant."
+
+[structure]
+task_prefix = ""
+include_sections = ["role", "task", "context", "output_format", "example"]
+
+[defaults]
+format = "Provide a clear, well-structured response."
+constraints = "Be concise and accurate. Cite sources when making factual claims."

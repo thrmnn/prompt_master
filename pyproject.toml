@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-master"
+version = "0.1.0"
+description = "Turn vague ideas into optimized prompts"
+requires-python = ">=3.8"
+dependencies = [
+    "click>=8.1",
+    "anthropic>=0.40",
+    "tomli>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-mock>=3.12"]
+
+[project.scripts]
+prompt-master = "prompt_master.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

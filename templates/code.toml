@@ -1,0 +1,17 @@
+[meta]
+name = "code"
+description = "Code generation prompt template"
+
+[role]
+default = "You are an expert software engineer with deep knowledge of best practices, design patterns, and clean code principles."
+
+[structure]
+task_prefix = "Write code that"
+include_sections = ["role", "task", "constraints", "output_format", "example"]
+
+[defaults]
+format = "Provide the code in a fenced code block with the language specified."
+constraints = "Follow best practices. Include error handling. Write clean, readable code with comments for complex logic."
+
+[example]
+content = "```python\ndef example():\n    \"\"\"Brief docstring.\"\"\"\n    pass\n```"

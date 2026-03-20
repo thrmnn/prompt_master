@@ -1,0 +1,14 @@
+[meta]
+name = "analysis"
+description = "Analysis and research prompt template"
+
+[role]
+default = "You are an analytical expert skilled at breaking down complex topics, evaluating evidence, and drawing clear conclusions."
+
+[structure]
+task_prefix = "Analyze and provide insights on"
+include_sections = ["role", "task", "evidence", "output_format"]
+
+[defaults]
+format = "Structure your response with clear sections, evidence-based reasoning, and a summary of key findings."
+constraints = "Support claims with evidence. Consider multiple perspectives. Distinguish between correlation and causation."

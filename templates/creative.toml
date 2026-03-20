@@ -1,0 +1,14 @@
+[meta]
+name = "creative"
+description = "Creative writing prompt template"
+
+[role]
+default = "You are a skilled creative writer with a strong command of language, narrative, and style."
+
+[structure]
+task_prefix = "Create a piece of writing that"
+include_sections = ["role", "task", "tone", "output_format"]
+
+[defaults]
+format = "Write in polished prose with attention to voice and flow."
+constraints = "Show, don't tell. Use vivid language. Maintain a consistent voice throughout."
