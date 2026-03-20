@@ -16,6 +16,7 @@ from textual.binding import Binding
 from prompt_master.tui.attention import AttentionTracker, DwellEvent, DeepDwellEvent
 from prompt_master.tui.cache import LRUCache
 from prompt_master.tui.canvas import Canvas
+from prompt_master.tui.dimension_nav import DimensionNavigator
 
 
 SCAFFOLD_SECTIONS: Dict[str, str] = {
@@ -38,6 +39,7 @@ class CanvasApp(App):
         Binding("ctrl+s", "save", "Save", show=True),
         Binding("ctrl+c", "copy_prompt", "Copy", show=True),
         Binding("tab", "explore_section", "Explore", show=True, priority=True),
+        Binding("space", "steer_section", "Steer", show=True, priority=True),
         Binding("question_mark", "help", "Help", show=False),
     ]
 
@@ -240,6 +242,54 @@ class CanvasApp(App):
 
         if show:
             self.call_from_thread(self.canvas.show_variations, section, variations)
+
+    # ── Dimension steering (Space) ───────────────────────────────────
+
+    def action_steer_section(self) -> None:
+        """Space pressed — open the dimension navigator to steer the focused section."""
+        # Don't hijack space when typing in the floor input or a TextArea
+        try:
+            floor = self.canvas.query_one("#floor-input")
+            if floor.has_focus:
+                return
+        except Exception:
+            pass
+
+        # Check if a TextArea has focus (user is typing in a section)
+        from prompt_master.tui.section_block import SectionEditor
+        for editor in self.query(SectionEditor):
+            if editor.has_focus:
+                return
+
+        section = self._active_section or self.canvas.get_focused_section()
+        if not section:
+            return
+
+        # Save the original content so we can revert on Esc
+        from prompt_master.vibe import _parse_sections
+        sections = _parse_sections(self.canvas.get_prompt_text())
+        self._steer_original = sections.get(section, "")
+        self._steer_section = section
+
+        self.canvas.dimension_nav.open_for_section(section)
+
+    def on_dimension_navigator_dimension_changed(self, message: DimensionNavigator.DimensionChanged) -> None:
+        """A dimension value changed — morph the section content in real-time."""
+        from prompt_master.tui.section_vibe import _manual_section_variant
+
+        section = message.section_name
+        original = getattr(self, "_steer_original", "")
+        if not original:
+            return
+
+        # Apply the dimension transform to the original content
+        new_content = _manual_section_variant(section, original, message.dimension, message.value)
+        self.canvas.update_section(section, new_content, highlight=False)
+
+    def on_dimension_navigator_navigator_closed(self, message: DimensionNavigator.NavigatorClosed) -> None:
+        """Navigator closed — auto-copy the result."""
+        self._run_scoring()
+        self._auto_copy()
 
     # ── Clipboard ─────────────────────────────────────────────────────
 
@@ -459,7 +509,7 @@ class CanvasApp(App):
 
     def action_help(self) -> None:
         self.notify(
-            "Tab: explore variations | Ctrl+C: copy | Ctrl+S: save | "
-            "Ctrl+Q: quit | Type below to refine",
-            timeout=6,
+            "Space: steer (◄► dimension, ▲▼ value) | Tab: explore variations | "
+            "Ctrl+C: copy | Ctrl+S: save | Ctrl+Q: quit | Type below: refine",
+            timeout=8,
         )

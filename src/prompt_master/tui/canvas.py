@@ -11,6 +11,7 @@ from textual.widgets import Input, LoadingIndicator, Static
 
 from prompt_master.tui.section_block import SectionBlock
 from prompt_master.tui.status_line import StatusLine
+from prompt_master.tui.dimension_nav import DimensionNavigator
 from prompt_master.tui.variation_drawer import VariationDrawer, VariationSelected
 from prompt_master.tui.whisper import WhisperOverlay, WhisperData
 
@@ -74,6 +75,7 @@ class Canvas(Vertical):
         with ScrollableContainer(id="sections-container"):
             pass
         yield VariationDrawer(section_name="", id="variation-drawer")
+        yield DimensionNavigator(id="dimension-nav")
         yield WhisperOverlay(id="whisper")
         yield Static("", id="conversation-zone")
         yield LoadingIndicator(id="loading-bar")
@@ -137,6 +139,10 @@ class Canvas(Vertical):
     def drawer(self) -> VariationDrawer:
         return self.query_one("#variation-drawer", VariationDrawer)
 
+    @property
+    def dimension_nav(self) -> DimensionNavigator:
+        return self.query_one("#dimension-nav", DimensionNavigator)
+
     # ── Loading ───────────────────────────────────────────────────────
 
     def show_loading(self, message: str = "") -> None:
@@ -196,6 +202,10 @@ class Canvas(Vertical):
         """User picked a variation — apply it to the section."""
         self.update_section(message.section_name, message.variation_text, highlight=True)
         self.hide_variations()
+
+    def on_dimension_navigator_dimension_changed(self, message: DimensionNavigator.DimensionChanged) -> None:
+        """Dimension value changed — bubble up for the app to morph the section."""
+        pass  # Handled by CanvasApp
 
     def on_canvas_populate_sections(self, message: PopulateSections) -> None:
         self.populate_sections(message.sections)
