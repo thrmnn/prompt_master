@@ -46,6 +46,12 @@ prompt-master = "prompt_master.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+prompt_master = [
+    "templates/*.toml",
+    "benchmarks/cases/*.toml",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
