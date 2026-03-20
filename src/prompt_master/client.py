@@ -1,25 +1,25 @@
-"""Thin wrapper around LLM providers with retry, model selection, and cost tracking.
+"""LLM client with streaming, retry, model selection, and cost tracking.
 
-Supports two providers:
-- "openclaw" (default): calls `openclaw agent` CLI — no API key needed if OpenClaw is configured
-- "anthropic": direct Anthropic SDK — requires ANTHROPIC_API_KEY
+Key resolution order:
+1. Explicit api_key parameter
+2. ANTHROPIC_API_KEY environment variable
+3. OpenClaw's stored Anthropic key (~/.openclaw/agents/main/agent/auth-profiles.json)
+4. Raise NoAPIKeyError
+
+This means: if you have OpenClaw installed and configured, everything
+just works — no env var needed. The SDK is used directly for streaming.
 """
 
 import json
 import os
-import shutil
-import subprocess
 import time
+from pathlib import Path
 from typing import Generator, List, Optional
 
-from anthropic import Anthropic, APIError, APIConnectionError, RateLimitError
+from anthropic import Anthropic, APIConnectionError, RateLimitError
 
 
 class NoAPIKeyError(Exception):
-    pass
-
-
-class NoProviderError(Exception):
     pass
 
 
@@ -36,6 +36,12 @@ DEFAULT_MODEL = "sonnet"
 MAX_RETRIES = 3
 RETRY_BASE_DELAY = 1.0  # seconds
 RETRYABLE_EXCEPTIONS = (APIConnectionError, RateLimitError)
+
+# OpenClaw auth config paths (checked in order)
+_OPENCLAW_AUTH_PATHS = [
+    Path.home() / ".openclaw" / "agents" / "main" / "agent" / "auth-profiles.json",
+    Path.home() / ".openclaw-dev" / "agents" / "main" / "agent" / "auth-profiles.json",
+]
 
 
 def _get_model_id(model_name: Optional[str] = None) -> str:
@@ -54,22 +60,51 @@ def estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> flo
 
 
 def _openclaw_available() -> bool:
-    """Check if openclaw CLI is installed and accessible."""
+    """Check if openclaw is installed (for backwards compat checks)."""
+    import shutil
     return shutil.which("openclaw") is not None
 
 
-def detect_provider() -> str:
-    """Detect the best available provider.
+def _read_openclaw_key() -> Optional[str]:
+    """Try to read the Anthropic API key from OpenClaw's auth config."""
+    for auth_path in _OPENCLAW_AUTH_PATHS:
+        if not auth_path.exists():
+            continue
+        try:
+            data = json.loads(auth_path.read_text())
+            profiles = data.get("profiles", {})
+            for _name, profile in profiles.items():
+                if isinstance(profile, dict) and profile.get("provider") == "anthropic":
+                    token = profile.get("token", "")
+                    if token and token.startswith("sk-"):
+                        return token
+        except (json.JSONDecodeError, KeyError, OSError):
+            continue
+    return None
 
-    Priority: openclaw (if installed) > anthropic (if key set) > error
+
+def _resolve_api_key(api_key: Optional[str] = None) -> str:
+    """Resolve API key from multiple sources.
+
+    Priority: explicit param > env var > OpenClaw config > error
     """
-    if _openclaw_available():
-        return "openclaw"
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        return "anthropic"
-    raise NoProviderError(
-        "No LLM provider available. Install OpenClaw (https://github.com/openclaw/openclaw) "
-        "or set ANTHROPIC_API_KEY."
+    # 1. Explicit
+    if api_key:
+        return api_key
+
+    # 2. Environment
+    env_key = os.environ.get("ANTHROPIC_API_KEY")
+    if env_key:
+        return env_key
+
+    # 3. OpenClaw config
+    oc_key = _read_openclaw_key()
+    if oc_key:
+        return oc_key
+
+    raise NoAPIKeyError(
+        "No API key found. Set ANTHROPIC_API_KEY, or install OpenClaw "
+        "(https://github.com/openclaw/openclaw) with an Anthropic key configured."
     )
 
 
@@ -95,137 +130,12 @@ class UsageStats:
         )
 
 
-# ── OpenClaw provider ──────────────────────────────────────────────────────
+class ClaudeClient:
+    """Unified LLM client with streaming support.
 
-
-# Map prompt-master model names to openclaw agent names
-OPENCLAW_AGENTS = {
-    "haiku": "prompt-master-fast",
-    "sonnet": "main",
-    "opus": "main",
-}
-
-
-class OpenClawClient:
-    """Calls LLMs through the OpenClaw CLI — no API key needed."""
-
-    def __init__(
-        self,
-        model: Optional[str] = None,
-        max_tokens: int = 4096,
-        agent: Optional[str] = None,
-    ):
-        if not _openclaw_available():
-            raise NoProviderError("OpenClaw CLI not found. Install from https://github.com/openclaw/openclaw")
-        self.model_name = model or DEFAULT_MODEL
-        self.default_max_tokens = max_tokens
-        # Use model-specific agent if available, otherwise default
-        self.agent = agent or OPENCLAW_AGENTS.get(self.model_name, "main")
-        self.usage = UsageStats()
-
-    def _call_openclaw(self, message: str, timeout: int = 120) -> dict:
-        """Call openclaw agent and return the parsed JSON result."""
-        cmd = [
-            "openclaw", "agent",
-            "--agent", self.agent,
-            "--local",
-            "--message", message,
-            "--json",
-            "--thinking", "off",
-        ]
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if result.returncode != 0:
-            stderr = result.stderr.strip()
-            raise RuntimeError(f"OpenClaw error: {stderr}")
-
-        # Parse JSON from stdout (skip any ANSI warning lines)
-        stdout = result.stdout
-        # Find the JSON object in the output
-        json_start = stdout.find("{")
-        if json_start == -1:
-            raise RuntimeError(f"No JSON in OpenClaw output: {stdout[:200]}")
-        data = json.loads(stdout[json_start:])
-
-        # Track usage
-        meta = data.get("meta", {})
-        agent_meta = meta.get("agentMeta", {})
-        usage = agent_meta.get("usage", {})
-        self.usage.record(
-            self.model_name,
-            usage.get("input", 0) + usage.get("cacheRead", 0),
-            usage.get("output", 0),
-        )
-
-        return data
-
-    def _extract_text(self, data: dict) -> str:
-        """Extract the text response from OpenClaw JSON output."""
-        payloads = data.get("payloads", [])
-        if not payloads:
-            return ""
-        return payloads[0].get("text", "")
-
-    def _build_message(self, system_prompt: str, user_message: str) -> str:
-        """Build a combined message for OpenClaw (system + user in one shot)."""
-        return (
-            f"[SYSTEM INSTRUCTIONS — follow these exactly]\n\n"
-            f"{system_prompt}\n\n"
-            f"[END SYSTEM INSTRUCTIONS]\n\n"
-            f"[USER MESSAGE]\n\n"
-            f"{user_message}"
-        )
-
-    def _build_conversation_message(self, system_prompt: str, messages: List[dict]) -> str:
-        """Build a conversation history into a single message for OpenClaw."""
-        parts = [
-            f"[SYSTEM INSTRUCTIONS — follow these exactly]\n\n{system_prompt}\n\n[END SYSTEM INSTRUCTIONS]"
-        ]
-        for msg in messages:
-            role = msg["role"].upper()
-            parts.append(f"\n[{role}]\n{msg['content']}")
-        return "\n".join(parts)
-
-    def generate(
-        self, system_prompt: str, user_message: str, max_tokens: Optional[int] = None
-    ) -> str:
-        message = self._build_message(system_prompt, user_message)
-        data = self._call_openclaw(message)
-        return self._extract_text(data)
-
-    def converse(
-        self,
-        system_prompt: str,
-        messages: List[dict],
-        max_tokens: Optional[int] = None,
-    ) -> str:
-        message = self._build_conversation_message(system_prompt, messages)
-        data = self._call_openclaw(message)
-        return self._extract_text(data)
-
-    def converse_stream(
-        self,
-        system_prompt: str,
-        messages: List[dict],
-        max_tokens: Optional[int] = None,
-    ) -> Generator[str, None, None]:
-        """OpenClaw doesn't support streaming, so yield the full response at once."""
-        text = self.converse(system_prompt, messages, max_tokens)
-        # Yield in chunks to simulate streaming for the UI
-        chunk_size = 20
-        for i in range(0, len(text), chunk_size):
-            yield text[i : i + chunk_size]
-
-
-# ── Anthropic provider ─────────────────────────────────────────────────────
-
-
-class AnthropicClient:
-    """Direct Anthropic SDK client — requires ANTHROPIC_API_KEY."""
+    Resolves the API key automatically — from env, OpenClaw config, or explicit param.
+    Always uses the Anthropic SDK directly for real streaming.
+    """
 
     def __init__(
         self,
@@ -233,11 +143,7 @@ class AnthropicClient:
         model: Optional[str] = None,
         max_tokens: int = 4096,
     ):
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            raise NoAPIKeyError(
-                "No API key found. Set ANTHROPIC_API_KEY or use --no-api for template mode."
-            )
+        self.api_key = _resolve_api_key(api_key)
         self._client = Anthropic(api_key=self.api_key)
         self.model_name = model or DEFAULT_MODEL
         self.model_id = _get_model_id(self.model_name)
@@ -245,6 +151,7 @@ class AnthropicClient:
         self.usage = UsageStats()
 
     def _retry(self, fn, *args, **kwargs):
+        """Execute fn with exponential backoff retry on transient errors."""
         last_exc = None
         for attempt in range(MAX_RETRIES):
             try:
@@ -279,6 +186,7 @@ class AnthropicClient:
         messages: List[dict],
         max_tokens: Optional[int] = None,
     ) -> str:
+        """Send a multi-turn conversation and return the full response."""
         max_tokens = max_tokens or self.default_max_tokens
 
         def _call():
@@ -299,6 +207,11 @@ class AnthropicClient:
         messages: List[dict],
         max_tokens: Optional[int] = None,
     ) -> Generator[str, None, None]:
+        """Send a multi-turn conversation and yield streamed text chunks.
+
+        This gives real token-by-token streaming — the prompt appears to
+        emerge as the model generates it.
+        """
         max_tokens = max_tokens or self.default_max_tokens
 
         def _call():
@@ -321,6 +234,16 @@ class AnthropicClient:
                     getattr(final.usage, "output_tokens", 0),
                 )
 
+    def generate_stream(
+        self, system_prompt: str, user_message: str, max_tokens: Optional[int] = None
+    ) -> Generator[str, None, None]:
+        """Single-turn generation with streaming."""
+        return self.converse_stream(
+            system_prompt=system_prompt,
+            messages=[{"role": "user", "content": user_message}],
+            max_tokens=max_tokens,
+        )
+
     def _track_usage(self, response):
         if hasattr(response, "usage"):
             self.usage.record(
@@ -328,39 +251,3 @@ class AnthropicClient:
                 getattr(response.usage, "input_tokens", 0),
                 getattr(response.usage, "output_tokens", 0),
             )
-
-
-# ── Unified ClaudeClient factory ───────────────────────────────────────────
-
-
-def ClaudeClient(
-    api_key: Optional[str] = None,
-    model: Optional[str] = None,
-    max_tokens: int = 4096,
-    provider: Optional[str] = None,
-):
-    """Create the best available LLM client.
-
-    Provider priority:
-    1. Explicit provider parameter ("openclaw" or "anthropic")
-    2. OpenClaw if installed
-    3. Anthropic if ANTHROPIC_API_KEY is set
-    4. Raise NoProviderError
-
-    Returns an OpenClawClient or AnthropicClient — both have the same interface:
-    generate(), converse(), converse_stream(), usage
-    """
-    if provider == "anthropic":
-        return AnthropicClient(api_key=api_key, model=model, max_tokens=max_tokens)
-    if provider == "openclaw":
-        return OpenClawClient(model=model, max_tokens=max_tokens)
-
-    # Auto-detect
-    if _openclaw_available():
-        return OpenClawClient(model=model, max_tokens=max_tokens)
-    if api_key or os.environ.get("ANTHROPIC_API_KEY"):
-        return AnthropicClient(api_key=api_key, model=model, max_tokens=max_tokens)
-
-    raise NoAPIKeyError(
-        "No LLM provider available. Install OpenClaw or set ANTHROPIC_API_KEY."
-    )

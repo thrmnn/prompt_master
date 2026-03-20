@@ -99,18 +99,20 @@ class Canvas(Vertical):
             parts.append(f"# {block.section_name}\n{text}")
         return "\n\n".join(parts)
 
-    def update_section(self, name: str, content: str) -> None:
-        """Update a specific section by name, with highlight."""
+    def update_section(self, name: str, content: str, highlight: bool = True) -> None:
+        """Update a specific section by name, optionally with highlight."""
         for block in self.query(SectionBlock):
             if block.section_name == name:
                 block.set_content(content)
-                block.highlight = True
+                if highlight:
+                    block.highlight = True
                 return
         # Section doesn't exist — add it
         container = self.query_one("#sections-container", ScrollableContainer)
         block = SectionBlock(section_name=name, content=content)
         container.mount(block)
-        block.highlight = True
+        if highlight:
+            block.highlight = True
 
     @property
     def status_line(self) -> StatusLine:

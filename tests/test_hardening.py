@@ -12,7 +12,7 @@ from prompt_master.cli import main
 from prompt_master.validation import ValidationError, validate_idea, validate_template
 from prompt_master.config import load_config, DEFAULTS
 from prompt_master.history import record, load_history, clear_history
-from prompt_master.client import ClaudeClient, NoAPIKeyError, UsageStats, estimate_cost, MODELS, OpenClawClient
+from prompt_master.client import ClaudeClient, NoAPIKeyError, UsageStats, estimate_cost, MODELS
 
 
 # ── Input validation ────────────────────────────────────────────────────────
@@ -226,16 +226,17 @@ class TestClientFeatures:
         assert stats.total_output_tokens == 150
         assert "Tokens:" in stats.summary()
 
-    def test_no_provider_raises_when_nothing_available(self, monkeypatch):
+    def test_no_key_raises_when_nothing_available(self, monkeypatch):
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.setattr("prompt_master.client._openclaw_available", lambda: False)
+        monkeypatch.setattr("prompt_master.client._read_openclaw_key", lambda: None)
         with pytest.raises(NoAPIKeyError):
             ClaudeClient()
 
-    def test_openclaw_preferred_over_anthropic(self, monkeypatch):
-        monkeypatch.setattr("prompt_master.client._openclaw_available", lambda: True)
+    def test_openclaw_key_used_when_no_env(self, monkeypatch):
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr("prompt_master.client._read_openclaw_key", lambda: "sk-ant-test-key")
         client = ClaudeClient()
-        assert isinstance(client, OpenClawClient)
+        assert client.api_key == "sk-ant-test-key"
 
 
 # ── Output formats ──────────────────────────────────────────────────────────

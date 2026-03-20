@@ -11,7 +11,6 @@ from textual.binding import Binding
 from prompt_master.tui.canvas import Canvas
 
 
-# Scaffold sections shown when no idea is provided.
 SCAFFOLD_SECTIONS: Dict[str, str] = {
     "Role": "[describe who the AI should be...]",
     "Task": "[what should it do?]",
@@ -51,7 +50,6 @@ class CanvasApp(App):
         self._model = model
         self._no_api = no_api
         self._session_id: str = ""
-        self._conversation_history: list[dict] = []
 
     # ── Layout ────────────────────────────────────────────────────────
 
@@ -70,143 +68,200 @@ class CanvasApp(App):
     def canvas(self) -> Canvas:
         return self.query_one("#canvas", Canvas)
 
-    # ── Initial population ─────────────────────────────────────────────
+    # ── Initial generation (streaming) ─────────────────────────────────
 
     def _show_scaffold(self) -> None:
         self.canvas.populate_sections(SCAFFOLD_SECTIONS)
 
     def _generate_initial(self) -> None:
         from prompt_master.session import generate_session_id
-
         self._session_id = generate_session_id()
         self.canvas.status_line.update_session(self._session_id)
-        self.canvas.show_loading("generating initial prompt...")
+        self.canvas.show_loading("generating prompt...")
+        self.run_worker(self._stream_initial, name="generate", thread=True)
 
-        self.run_worker(self._run_optimization, name="optimize", thread=True)
+    def _stream_initial(self) -> None:
+        """Stream the initial prompt generation token by token."""
+        from prompt_master.client import ClaudeClient, NoAPIKeyError
+        from prompt_master.optimizer import META_SYSTEM_PROMPT, TARGET_INSTRUCTIONS
 
-    def _run_optimization(self) -> None:
-        from prompt_master.optimizer import optimize_prompt
+        try:
+            client = ClaudeClient(model=self._model or "sonnet")
+        except NoAPIKeyError:
+            # Fall back to template
+            from prompt_master.optimizer import optimize_prompt
+            from prompt_master.vibe import _parse_sections
+            result = optimize_prompt(self._idea, self._target, use_api=False)
+            sections = _parse_sections(result.optimized_prompt)
+            self.call_from_thread(self._finish_generation, sections, client=None)
+            return
+
+        target_inst = TARGET_INSTRUCTIONS.get(self._target, TARGET_INSTRUCTIONS["general"])
+        user_msg = f"**Idea:** {self._idea}\n\n**Target:** {target_inst}"
+
+        accumulated = ""
+        try:
+            for chunk in client.generate_stream(META_SYSTEM_PROMPT, user_msg):
+                accumulated += chunk
+                self.call_from_thread(self._stream_update, accumulated)
+        except Exception as e:
+            self.call_from_thread(self._generation_error, str(e))
+            return
+
         from prompt_master.vibe import _parse_sections
+        sections = _parse_sections(accumulated)
+        self.call_from_thread(self._finish_generation, sections, client)
 
-        result = optimize_prompt(
-            idea=self._idea,
-            target=self._target,
-            use_api=not self._no_api,
-            model=self._model,
-        )
-        sections = _parse_sections(result.optimized_prompt)
-        self.call_from_thread(self._apply_optimization, sections, result)
+    def _stream_update(self, text_so_far: str) -> None:
+        """Called on main thread during streaming — progressively update sections."""
+        from prompt_master.vibe import _parse_sections
+        sections = _parse_sections(text_so_far)
+        # Only update sections that have content
+        for name, content in sections.items():
+            if name == "_preamble" or not content.strip():
+                continue
+            self.canvas.update_section(name, content, highlight=False)
 
-    def _apply_optimization(self, sections: dict, result) -> None:
+    def _finish_generation(self, sections: dict, client) -> None:
+        """Generation complete — final update and stats."""
         self.canvas.hide_loading()
-        self.canvas.populate_sections(sections)
+        for name, content in sections.items():
+            if name == "_preamble":
+                continue
+            self.canvas.update_section(name, content, highlight=False)
 
         status = self.canvas.status_line
         status.update_session(self._session_id)
-        token_est = len(result.optimized_prompt) // 4
-        status.update_tokens(token_est, 50_000)
+        prompt_text = self.canvas.get_prompt_text()
+        status.update_tokens(len(prompt_text) // 4, 50_000)
 
-        usage_summary = result.metadata.get("usage_summary", "")
-        if usage_summary:
-            for part in usage_summary.split("|"):
+        if client:
+            for part in client.usage.summary().split("|"):
                 part = part.strip()
                 if part.startswith("Cost:"):
                     status.update_cost(part.replace("Cost:", "").strip())
-                    break
 
-    # ── Floor input: conversation ──────────────────────────────────────
+        # Score sections
+        self._run_scoring()
+
+    def _generation_error(self, error_msg: str) -> None:
+        self.canvas.hide_loading()
+        self.notify(f"Error: {error_msg}", severity="error", timeout=5)
+        self._show_scaffold()
+
+    # ── Floor input: streaming refinement ──────────────────────────────
 
     def on_canvas_user_submitted(self, message: Canvas.UserSubmitted) -> None:
-        """User typed something in the floor input — send to AI for refinement."""
         user_text = message.text
-
         if self._no_api:
             self.notify("Offline mode — edit sections directly above", timeout=3)
             return
-
-        # Build the refinement prompt from current sections + user message
-        current_prompt = self.canvas.get_prompt_text()
-
-        self._conversation_history.append({"role": "user", "content": user_text})
-        self.canvas.show_loading("refining with AI...")
-
+        self.canvas.show_loading("refining...")
         self.run_worker(
-            lambda: self._run_refinement(current_prompt, user_text),
+            lambda: self._stream_refinement(user_text),
             name="refine",
             thread=True,
         )
 
-    def _run_refinement(self, current_prompt: str, user_message: str) -> None:
-        """Worker thread: send current prompt + user request to AI.
-
-        Uses haiku by default for fast interactive refinement, unless the
-        user explicitly chose a different model.
-        """
+    def _stream_refinement(self, user_message: str) -> None:
+        """Stream refinement response — sections update as tokens arrive."""
         from prompt_master.client import ClaudeClient, NoAPIKeyError
         from prompt_master.vibe import _parse_sections
 
+        current_prompt = self.call_from_thread(self.canvas.get_prompt_text)
+
         system = (
-            "You are a prompt refinement assistant. The user has a prompt they want to improve. "
-            "They will tell you what to change. Apply their feedback and return the COMPLETE "
-            "updated prompt with ALL sections (# Role, # Task, etc.). "
-            "Output ONLY the updated prompt in markdown format — no commentary, no explanation."
+            "You are a prompt refinement assistant. Apply the user's feedback to "
+            "the prompt and return the COMPLETE updated prompt with ALL sections "
+            "(# Role, # Task, etc.). Output ONLY the prompt — no commentary."
         )
-
         user_content = (
-            f"Here is the current prompt:\n\n{current_prompt}\n\n"
-            f"---\n\nUser request: {user_message}\n\n"
-            f"Apply this change and return the complete updated prompt."
+            f"Current prompt:\n\n{current_prompt}\n\n---\n\n"
+            f"User request: {user_message}\n\n"
+            f"Return the complete updated prompt."
         )
 
-        # Use haiku for refinement (fast) unless user specified otherwise
         refine_model = self._model if self._model else "haiku"
 
         try:
             client = ClaudeClient(model=refine_model)
-            response = client.generate(system, user_content)
+            accumulated = ""
+            for chunk in client.generate_stream(system, user_content):
+                accumulated += chunk
+                self.call_from_thread(self._stream_update, accumulated)
 
-            sections = _parse_sections(response)
-            # Filter out empty preamble
-            sections = {k: v for k, v in sections.items() if k != "_preamble" or v.strip()}
-
-            self._conversation_history.append({"role": "assistant", "content": response})
-
+            sections = _parse_sections(accumulated)
             self.call_from_thread(
-                self._apply_refinement, sections, user_message, client
+                self._finish_refinement, sections, user_message, client
             )
-
         except (NoAPIKeyError, Exception) as e:
             self.call_from_thread(self._refinement_error, str(e))
 
-    def _apply_refinement(self, sections: dict, user_msg: str, client) -> None:
-        """Apply AI refinement to the canvas."""
+    def _finish_refinement(self, sections: dict, user_msg: str, client) -> None:
         self.canvas.hide_loading()
 
-        # Update each section with highlights
+        updated = []
         for name, content in sections.items():
             if name == "_preamble":
                 continue
-            self.canvas.update_section(name, content)
+            self.canvas.update_section(name, content, highlight=True)
+            updated.append(name)
 
-        # Show the exchange
-        updated = [n for n in sections if n != "_preamble"]
         summary = f"Updated: {', '.join(updated)}" if updated else "No changes"
         self.canvas.show_exchange(user_msg, summary)
 
-        # Update usage stats
         status = self.canvas.status_line
-        usage = client.usage.summary()
-        for part in usage.split("|"):
+        status.update_tokens(len(self.canvas.get_prompt_text()) // 4, 50_000)
+        for part in client.usage.summary().split("|"):
             part = part.strip()
             if part.startswith("Cost:"):
                 status.update_cost(part.replace("Cost:", "").strip())
 
-        token_est = len(self.canvas.get_prompt_text()) // 4
-        status.update_tokens(token_est, 50_000)
+        self._run_scoring()
 
     def _refinement_error(self, error_msg: str) -> None:
         self.canvas.hide_loading()
         self.notify(f"Error: {error_msg}", severity="error", timeout=5)
+
+    # ── Cursor-based intelligence ──────────────────────────────────────
+
+    def on_section_block_section_focused(self, message) -> None:
+        """Section got focus — run scoring and show whisper if weak."""
+        self._run_scoring()
+        section_name = message.section_name
+        # Check if this section is weak and show a whisper
+        from prompt_master.tui.realtime_scorer import score_sections
+        from prompt_master.vibe import _parse_sections
+
+        prompt_text = self.canvas.get_prompt_text()
+        sections = _parse_sections(prompt_text)
+        scores = score_sections(sections, self._target)
+
+        if section_name in scores:
+            sc = scores[section_name]
+            if sc.score < 7.0 and sc.feedback:
+                self.notify(
+                    f"[dim]{section_name}: {sc.score:.0f}/10 — {sc.feedback}[/dim]",
+                    timeout=5,
+                )
+
+    def _run_scoring(self) -> None:
+        """Score all sections and update the section block scores."""
+        from prompt_master.tui.realtime_scorer import score_sections, compute_overall_score
+        from prompt_master.vibe import _parse_sections
+
+        prompt_text = self.canvas.get_prompt_text()
+        sections = _parse_sections(prompt_text)
+        scores = score_sections(sections, self._target)
+
+        # Update each section block's score indicator
+        from prompt_master.tui.section_block import SectionBlock
+        for block in self.query(SectionBlock):
+            if block.section_name in scores:
+                block.score = scores[block.section_name].score
+
+        overall = compute_overall_score(scores)
+        self.canvas.status_line.update_score(overall)
 
     # ── Session management ────────────────────────────────────────────
 
@@ -217,18 +272,15 @@ class CanvasApp(App):
         try:
             session_id, engine = load_session(self._resume)
             self._session_id = session_id
-
             if engine.current_draft:
                 sections = _parse_sections(engine.current_draft)
             elif engine.final_prompt:
                 sections = _parse_sections(engine.final_prompt)
             else:
                 sections = SCAFFOLD_SECTIONS
-
             self.canvas.populate_sections(sections)
-            status = self.canvas.status_line
-            status.update_session(self._session_id)
-
+            self.canvas.status_line.update_session(self._session_id)
+            self._run_scoring()
         except FileNotFoundError as exc:
             self.notify(str(exc), severity="error", timeout=5)
             self._show_scaffold()
