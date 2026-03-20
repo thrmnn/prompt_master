@@ -17,6 +17,7 @@ from prompt_master.tui.attention import AttentionTracker, DwellEvent, DeepDwellE
 from prompt_master.tui.cache import LRUCache
 from prompt_master.tui.canvas import Canvas
 from prompt_master.tui.dimension_nav import DimensionNavigator
+from prompt_master.tui.exploration_pad import ExplorationPad
 
 
 SCAFFOLD_SECTIONS: Dict[str, str] = {
@@ -246,7 +247,7 @@ class CanvasApp(App):
     # ── Dimension steering (Space) ───────────────────────────────────
 
     def action_steer_section(self) -> None:
-        """Space pressed — open the dimension navigator to steer the focused section."""
+        """Space pressed — open the 2D exploration pad to steer the focused section."""
         # Don't hijack space when typing in the floor input or a TextArea
         try:
             floor = self.canvas.query_one("#floor-input")
@@ -255,7 +256,6 @@ class CanvasApp(App):
         except Exception:
             pass
 
-        # Check if a TextArea has focus (user is typing in a section)
         from prompt_master.tui.section_block import SectionEditor
         for editor in self.query(SectionEditor):
             if editor.has_focus:
@@ -265,16 +265,17 @@ class CanvasApp(App):
         if not section:
             return
 
-        # Save the original content so we can revert on Esc
+        # Save original content for revert on Esc
         from prompt_master.vibe import _parse_sections
         sections = _parse_sections(self.canvas.get_prompt_text())
         self._steer_original = sections.get(section, "")
         self._steer_section = section
 
-        self.canvas.dimension_nav.open_for_section(section)
+        # Open the exploration pad
+        self.canvas.exploration_pad.open_for_section(section)
 
-    def on_dimension_navigator_dimension_changed(self, message: DimensionNavigator.DimensionChanged) -> None:
-        """A dimension value changed — morph the section content in real-time."""
+    def on_exploration_pad_morph_request(self, message: ExplorationPad.MorphRequest) -> None:
+        """Mouse moved in the pad — morph the section along both axes in real-time."""
         from prompt_master.tui.section_vibe import _manual_section_variant
 
         section = message.section_name
@@ -282,12 +283,28 @@ class CanvasApp(App):
         if not original:
             return
 
-        # Apply the dimension transform to the original content
+        # Apply the X dimension first, then Y on top
+        intermediate = _manual_section_variant(section, original, message.x_dim, message.x_val)
+        final = _manual_section_variant(section, intermediate, message.y_dim, message.y_val)
+        self.canvas.update_section(section, final, highlight=False)
+
+    def on_exploration_pad_pad_closed(self, message: ExplorationPad.PadClosed) -> None:
+        """Pad closed — score and copy."""
+        self._run_scoring()
+        self._auto_copy()
+
+    def on_dimension_navigator_dimension_changed(self, message: DimensionNavigator.DimensionChanged) -> None:
+        """Discrete dimension navigator — also supported via the old path."""
+        from prompt_master.tui.section_vibe import _manual_section_variant
+
+        section = message.section_name
+        original = getattr(self, "_steer_original", "")
+        if not original:
+            return
         new_content = _manual_section_variant(section, original, message.dimension, message.value)
         self.canvas.update_section(section, new_content, highlight=False)
 
     def on_dimension_navigator_navigator_closed(self, message: DimensionNavigator.NavigatorClosed) -> None:
-        """Navigator closed — auto-copy the result."""
         self._run_scoring()
         self._auto_copy()
 

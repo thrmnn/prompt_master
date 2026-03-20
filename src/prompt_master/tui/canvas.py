@@ -12,6 +12,7 @@ from textual.widgets import Input, LoadingIndicator, Static
 from prompt_master.tui.section_block import SectionBlock
 from prompt_master.tui.status_line import StatusLine
 from prompt_master.tui.dimension_nav import DimensionNavigator
+from prompt_master.tui.exploration_pad import ExplorationPad
 from prompt_master.tui.variation_drawer import VariationDrawer, VariationSelected
 from prompt_master.tui.whisper import WhisperOverlay, WhisperData
 
@@ -76,6 +77,7 @@ class Canvas(Vertical):
             pass
         yield VariationDrawer(section_name="", id="variation-drawer")
         yield DimensionNavigator(id="dimension-nav")
+        yield ExplorationPad(id="exploration-pad")
         yield WhisperOverlay(id="whisper")
         yield Static("", id="conversation-zone")
         yield LoadingIndicator(id="loading-bar")
@@ -142,6 +144,10 @@ class Canvas(Vertical):
     @property
     def dimension_nav(self) -> DimensionNavigator:
         return self.query_one("#dimension-nav", DimensionNavigator)
+
+    @property
+    def exploration_pad(self) -> ExplorationPad:
+        return self.query_one("#exploration-pad", ExplorationPad)
 
     # ── Loading ───────────────────────────────────────────────────────
 
