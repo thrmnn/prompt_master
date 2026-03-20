@@ -1,4 +1,9 @@
-"""CanvasApp — root Textual application for Prompt Master."""
+"""CanvasApp — root Textual application for Prompt Master.
+
+Wires together: streaming generation, cursor-based intelligence (attention
+tracker + dwell events + whispers + variation pre-loading), auto-copy to
+clipboard, and inline variation exploration via Tab.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,8 @@ from typing import Dict, Optional
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 
+from prompt_master.tui.attention import AttentionTracker, DwellEvent, DeepDwellEvent
+from prompt_master.tui.cache import LRUCache
 from prompt_master.tui.canvas import Canvas
 
 
@@ -29,6 +36,8 @@ class CanvasApp(App):
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit", show=True),
         Binding("ctrl+s", "save", "Save", show=True),
+        Binding("ctrl+c", "copy_prompt", "Copy", show=True),
+        Binding("tab", "explore_section", "Explore", show=True, priority=True),
         Binding("question_mark", "help", "Help", show=False),
     ]
 
@@ -50,6 +59,9 @@ class CanvasApp(App):
         self._model = model
         self._no_api = no_api
         self._session_id: str = ""
+        self._attention = AttentionTracker()
+        self._variation_cache = LRUCache(max_size=30)
+        self._active_section: Optional[str] = None
 
     # ── Layout ────────────────────────────────────────────────────────
 
@@ -64,9 +76,187 @@ class CanvasApp(App):
         else:
             self._show_scaffold()
 
+        # Start the attention tick timer (200ms)
+        self.set_interval(0.2, self._attention_tick)
+
     @property
     def canvas(self) -> Canvas:
         return self.query_one("#canvas", Canvas)
+
+    # ── Attention system ──────────────────────────────────────────────
+
+    def on_section_block_section_focused(self, message) -> None:
+        """Section got focus — feed attention tracker, score, whisper."""
+        section = message.section_name
+        self._active_section = section
+
+        # Feed the attention tracker
+        events = self._attention.on_section_focus(section)
+        for evt in events:
+            self._handle_attention_event(evt)
+
+        # Dismiss whisper if for a different section
+        if self.canvas.whisper.current_section and self.canvas.whisper.current_section != section:
+            self.canvas.dismiss_whisper()
+
+        # Hide variation drawer if showing for different section
+        drawer = self.canvas.drawer
+        if drawer.has_class("visible") and drawer._section_name != section:
+            self.canvas.hide_variations()
+
+        # Score
+        self._run_scoring()
+
+    def _attention_tick(self) -> None:
+        """Called every 200ms — check for dwell events."""
+        events = self._attention.tick()
+        for evt in events:
+            self._handle_attention_event(evt)
+
+    def _handle_attention_event(self, evt) -> None:
+        """React to attention events."""
+        if isinstance(evt, DeepDwellEvent):
+            # Pre-generate variations in background
+            self._preload_variations(evt.section)
+        elif isinstance(evt, DwellEvent):
+            # Show score whisper for weak sections
+            self._show_section_whisper(evt.section)
+
+    def _show_section_whisper(self, section: str) -> None:
+        """Show a contextual whisper for a section based on its score."""
+        from prompt_master.tui.realtime_scorer import score_sections, detect_decomposition
+        from prompt_master.vibe import _parse_sections
+
+        prompt_text = self.canvas.get_prompt_text()
+        sections = _parse_sections(prompt_text)
+        scores = score_sections(sections, self._target)
+
+        if section in scores:
+            sc = scores[section]
+            if sc.score < 7.0 and sc.feedback:
+                self.canvas.show_whisper(
+                    f"{sc.score:.0f}/10 — {sc.feedback}",
+                    section=section,
+                    priority=1,
+                    ttl=6.0,
+                )
+            elif sc.score >= 8.0:
+                cached = self._variation_cache.get(
+                    self._variation_cache.content_key(section, sections.get(section, ""))
+                )
+                if cached:
+                    self.canvas.show_whisper(
+                        f"{sc.score:.0f}/10 | Tab to explore {len(cached)} variations",
+                        section=section,
+                        priority=0,
+                        ttl=4.0,
+                    )
+
+        # Check for workflow decomposition opportunity
+        task = sections.get("Task", "")
+        if task and section == "Task":
+            decomp = detect_decomposition(task)
+            if decomp:
+                self.canvas.show_whisper(
+                    decomp,
+                    section="Task",
+                    priority=2,
+                    ttl=8.0,
+                )
+
+    # ── Variation exploration (Tab) ───────────────────────────────────
+
+    def action_explore_section(self) -> None:
+        """Tab pressed — explore variations for the focused section."""
+        # Check if floor input has focus — if so, let Tab work normally
+        try:
+            floor = self.canvas.query_one("#floor-input")
+            if floor.has_focus:
+                return
+        except Exception:
+            pass
+
+        section = self._active_section or self.canvas.get_focused_section()
+        if not section:
+            return
+
+        # Check cache first
+        from prompt_master.vibe import _parse_sections
+        sections = _parse_sections(self.canvas.get_prompt_text())
+        content = sections.get(section, "")
+        cache_key = self._variation_cache.content_key(section, content)
+        cached = self._variation_cache.get(cache_key)
+
+        if cached:
+            self.canvas.show_variations(section, cached)
+        else:
+            # Generate on the fly
+            self.canvas.show_variations_loading(section)
+            self.run_worker(
+                lambda: self._generate_variations(section, content, cache_key),
+                name="explore",
+                thread=True,
+            )
+
+    def _preload_variations(self, section: str) -> None:
+        """Pre-generate variations in background (triggered by deep dwell)."""
+        from prompt_master.vibe import _parse_sections
+        sections = _parse_sections(self.canvas.get_prompt_text())
+        content = sections.get(section, "")
+        cache_key = self._variation_cache.content_key(section, content)
+
+        if self._variation_cache.get(cache_key):
+            return  # Already cached
+
+        self.run_worker(
+            lambda: self._generate_variations(section, content, cache_key, show=False),
+            name="preload",
+            thread=True,
+        )
+
+    def _generate_variations(
+        self, section: str, content: str, cache_key: str, show: bool = True
+    ) -> None:
+        """Worker thread: generate variations for a section."""
+        from prompt_master.tui.section_vibe import generate_section_variations
+
+        client = None
+        if not self._no_api:
+            try:
+                from prompt_master.client import ClaudeClient
+                client = ClaudeClient(model="haiku")
+            except Exception:
+                pass
+
+        variations = generate_section_variations(
+            section_name=section,
+            section_content=content,
+            target=self._target,
+            count=4,
+            client=client,
+        )
+
+        self._variation_cache.put(cache_key, variations)
+
+        if show:
+            self.call_from_thread(self.canvas.show_variations, section, variations)
+
+    # ── Clipboard ─────────────────────────────────────────────────────
+
+    def action_copy_prompt(self) -> None:
+        """Copy the full prompt to clipboard."""
+        prompt = self.canvas.get_prompt_text()
+        if not prompt.strip():
+            self.notify("Nothing to copy", timeout=2)
+            return
+        self.copy_to_clipboard(prompt)
+        self.notify("Prompt copied to clipboard", timeout=2)
+
+    def _auto_copy(self) -> None:
+        """Auto-copy after generation finishes."""
+        prompt = self.canvas.get_prompt_text()
+        if prompt.strip():
+            self.copy_to_clipboard(prompt)
 
     # ── Initial generation (streaming) ─────────────────────────────────
 
@@ -81,19 +271,17 @@ class CanvasApp(App):
         self.run_worker(self._stream_initial, name="generate", thread=True)
 
     def _stream_initial(self) -> None:
-        """Stream the initial prompt generation token by token."""
         from prompt_master.client import ClaudeClient, NoAPIKeyError
         from prompt_master.optimizer import META_SYSTEM_PROMPT, TARGET_INSTRUCTIONS
 
         try:
             client = ClaudeClient(model=self._model or "sonnet")
         except NoAPIKeyError:
-            # Fall back to template
             from prompt_master.optimizer import optimize_prompt
             from prompt_master.vibe import _parse_sections
             result = optimize_prompt(self._idea, self._target, use_api=False)
             sections = _parse_sections(result.optimized_prompt)
-            self.call_from_thread(self._finish_generation, sections, client=None)
+            self.call_from_thread(self._finish_generation, sections, None)
             return
 
         target_inst = TARGET_INSTRUCTIONS.get(self._target, TARGET_INSTRUCTIONS["general"])
@@ -113,17 +301,14 @@ class CanvasApp(App):
         self.call_from_thread(self._finish_generation, sections, client)
 
     def _stream_update(self, text_so_far: str) -> None:
-        """Called on main thread during streaming — progressively update sections."""
         from prompt_master.vibe import _parse_sections
         sections = _parse_sections(text_so_far)
-        # Only update sections that have content
         for name, content in sections.items():
             if name == "_preamble" or not content.strip():
                 continue
             self.canvas.update_section(name, content, highlight=False)
 
     def _finish_generation(self, sections: dict, client) -> None:
-        """Generation complete — final update and stats."""
         self.canvas.hide_loading()
         for name, content in sections.items():
             if name == "_preamble":
@@ -132,17 +317,16 @@ class CanvasApp(App):
 
         status = self.canvas.status_line
         status.update_session(self._session_id)
-        prompt_text = self.canvas.get_prompt_text()
-        status.update_tokens(len(prompt_text) // 4, 50_000)
-
+        status.update_tokens(len(self.canvas.get_prompt_text()) // 4, 50_000)
         if client:
             for part in client.usage.summary().split("|"):
                 part = part.strip()
                 if part.startswith("Cost:"):
                     status.update_cost(part.replace("Cost:", "").strip())
 
-        # Score sections
         self._run_scoring()
+        self._auto_copy()
+        self.notify("Prompt ready — copied to clipboard", timeout=3)
 
     def _generation_error(self, error_msg: str) -> None:
         self.canvas.hide_loading()
@@ -152,24 +336,21 @@ class CanvasApp(App):
     # ── Floor input: streaming refinement ──────────────────────────────
 
     def on_canvas_user_submitted(self, message: Canvas.UserSubmitted) -> None:
-        user_text = message.text
         if self._no_api:
-            self.notify("Offline mode — edit sections directly above", timeout=3)
+            self.notify("Offline mode — edit sections directly", timeout=3)
             return
         self.canvas.show_loading("refining...")
         self.run_worker(
-            lambda: self._stream_refinement(user_text),
+            lambda: self._stream_refinement(message.text),
             name="refine",
             thread=True,
         )
 
     def _stream_refinement(self, user_message: str) -> None:
-        """Stream refinement response — sections update as tokens arrive."""
         from prompt_master.client import ClaudeClient, NoAPIKeyError
         from prompt_master.vibe import _parse_sections
 
         current_prompt = self.call_from_thread(self.canvas.get_prompt_text)
-
         system = (
             "You are a prompt refinement assistant. Apply the user's feedback to "
             "the prompt and return the COMPLETE updated prompt with ALL sections "
@@ -177,10 +358,8 @@ class CanvasApp(App):
         )
         user_content = (
             f"Current prompt:\n\n{current_prompt}\n\n---\n\n"
-            f"User request: {user_message}\n\n"
-            f"Return the complete updated prompt."
+            f"User request: {user_message}\n\nReturn the complete updated prompt."
         )
-
         refine_model = self._model if self._model else "haiku"
 
         try:
@@ -191,15 +370,12 @@ class CanvasApp(App):
                 self.call_from_thread(self._stream_update, accumulated)
 
             sections = _parse_sections(accumulated)
-            self.call_from_thread(
-                self._finish_refinement, sections, user_message, client
-            )
+            self.call_from_thread(self._finish_refinement, sections, user_message, client)
         except (NoAPIKeyError, Exception) as e:
             self.call_from_thread(self._refinement_error, str(e))
 
     def _finish_refinement(self, sections: dict, user_msg: str, client) -> None:
         self.canvas.hide_loading()
-
         updated = []
         for name, content in sections.items():
             if name == "_preamble":
@@ -218,44 +394,29 @@ class CanvasApp(App):
                 status.update_cost(part.replace("Cost:", "").strip())
 
         self._run_scoring()
+        self._auto_copy()
+        # Invalidate variation cache for updated sections
+        for name in updated:
+            from prompt_master.vibe import _parse_sections
+            content = _parse_sections(self.canvas.get_prompt_text()).get(name, "")
+            cache_key = self._variation_cache.content_key(name, content)
+            # Old cache entries are stale — removal happens naturally via LRU
 
     def _refinement_error(self, error_msg: str) -> None:
         self.canvas.hide_loading()
         self.notify(f"Error: {error_msg}", severity="error", timeout=5)
 
-    # ── Cursor-based intelligence ──────────────────────────────────────
-
-    def on_section_block_section_focused(self, message) -> None:
-        """Section got focus — run scoring and show whisper if weak."""
-        self._run_scoring()
-        section_name = message.section_name
-        # Check if this section is weak and show a whisper
-        from prompt_master.tui.realtime_scorer import score_sections
-        from prompt_master.vibe import _parse_sections
-
-        prompt_text = self.canvas.get_prompt_text()
-        sections = _parse_sections(prompt_text)
-        scores = score_sections(sections, self._target)
-
-        if section_name in scores:
-            sc = scores[section_name]
-            if sc.score < 7.0 and sc.feedback:
-                self.notify(
-                    f"[dim]{section_name}: {sc.score:.0f}/10 — {sc.feedback}[/dim]",
-                    timeout=5,
-                )
+    # ── Scoring ───────────────────────────────────────────────────────
 
     def _run_scoring(self) -> None:
-        """Score all sections and update the section block scores."""
         from prompt_master.tui.realtime_scorer import score_sections, compute_overall_score
         from prompt_master.vibe import _parse_sections
+        from prompt_master.tui.section_block import SectionBlock
 
         prompt_text = self.canvas.get_prompt_text()
         sections = _parse_sections(prompt_text)
         scores = score_sections(sections, self._target)
 
-        # Update each section block's score indicator
-        from prompt_master.tui.section_block import SectionBlock
         for block in self.query(SectionBlock):
             if block.section_name in scores:
                 block.score = scores[block.section_name].score
@@ -268,7 +429,6 @@ class CanvasApp(App):
     def _load_session(self) -> None:
         from prompt_master.session import load_session
         from prompt_master.vibe import _parse_sections
-
         try:
             session_id, engine = load_session(self._resume)
             self._session_id = session_id
@@ -295,11 +455,11 @@ class CanvasApp(App):
             path.write_text(prompt_text)
             self.notify(f"Saved to {path}", timeout=3)
         else:
-            self.notify("No output file specified (use --output)", timeout=3)
+            self.notify("No output file (use --output)", timeout=3)
 
     def action_help(self) -> None:
         self.notify(
-            "Ctrl+S save | Ctrl+Q quit | Edit sections above | "
-            "Type below to refine with AI | ? help",
-            timeout=5,
+            "Tab: explore variations | Ctrl+C: copy | Ctrl+S: save | "
+            "Ctrl+Q: quit | Type below to refine",
+            timeout=6,
         )
