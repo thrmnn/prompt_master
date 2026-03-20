@@ -4,6 +4,11 @@ Screen {
     background: $surface;
 }
 
+Canvas {
+    width: 1fr;
+    height: 1fr;
+}
+
 /* ── Section blocks ──────────────────────────────────────────────────── */
 
 SectionBlock {

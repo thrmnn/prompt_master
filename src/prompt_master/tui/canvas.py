@@ -1,22 +1,20 @@
-"""Canvas screen — the single screen containing the prompt editor."""
+"""Canvas — the main container holding the prompt editor."""
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Dict
 
 from textual.app import ComposeResult
-from textual.containers import Container, ScrollableContainer
+from textual.containers import Container, ScrollableContainer, Vertical
 from textual.message import Message
-from textual.screen import Screen
 from textual.widgets import Input
 
 from prompt_master.tui.section_block import SectionBlock
 from prompt_master.tui.status_line import StatusLine
 
 
-class Canvas(Screen):
-    """Primary screen: scrollable section blocks, floor input, and status line.
+class Canvas(Vertical):
+    """Primary container: scrollable section blocks, floor input, and status line.
 
     Layout (top to bottom):
         - ScrollableContainer of SectionBlock widgets
@@ -24,8 +22,6 @@ class Canvas(Screen):
         - Floor Input (docked bottom, above status line)
         - StatusLine (docked bottom)
     """
-
-    CSS_PATH = Path(__file__).parent / "css" / "canvas.tcss"
 
     # ── Messages ──────────────────────────────────────────────────────
 

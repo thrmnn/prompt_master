@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, Optional
 
 from textual.app import App, ComposeResult
@@ -28,6 +29,7 @@ class CanvasApp(App):
     """
 
     TITLE = "Prompt Master"
+    CSS_PATH = Path(__file__).parent / "css" / "canvas.tcss"
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit", show=True),
