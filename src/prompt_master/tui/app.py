@@ -22,11 +22,7 @@ SCAFFOLD_SECTIONS: Dict[str, str] = {
 
 
 class CanvasApp(App):
-    """Prompt Master TUI — The Canvas.
-
-    Accepts an optional ``idea`` to generate an optimized prompt on launch,
-    or starts with scaffold sections for manual editing.
-    """
+    """Prompt Master TUI — The Canvas."""
 
     TITLE = "Prompt Master"
     CSS_PATH = Path(__file__).parent / "css" / "canvas.tcss"
@@ -55,15 +51,14 @@ class CanvasApp(App):
         self._model = model
         self._no_api = no_api
         self._session_id: str = ""
+        self._conversation_history: list[dict] = []
 
     # ── Layout ────────────────────────────────────────────────────────
 
     def compose(self) -> ComposeResult:
-        """The Canvas screen is composed directly as the app's root content."""
         yield Canvas(id="canvas")
 
     def on_mount(self) -> None:
-        """Populate initial content once the widget tree is ready."""
         if self._resume:
             self._load_session()
         elif self._idea:
@@ -71,37 +66,25 @@ class CanvasApp(App):
         else:
             self._show_scaffold()
 
-    # ── Canvas accessor ───────────────────────────────────────────────
-
     @property
     def canvas(self) -> Canvas:
         return self.query_one("#canvas", Canvas)
 
-    # ── Initial population strategies ─────────────────────────────────
+    # ── Initial population ─────────────────────────────────────────────
 
     def _show_scaffold(self) -> None:
-        """Show empty scaffold sections for manual editing."""
         self.canvas.populate_sections(SCAFFOLD_SECTIONS)
 
     def _generate_initial(self) -> None:
-        """Run optimize_prompt in a worker thread, then populate the canvas."""
         from prompt_master.session import generate_session_id
 
         self._session_id = generate_session_id()
+        self.canvas.status_line.update_session(self._session_id)
+        self.canvas.show_loading("generating initial prompt...")
 
-        # Update status line with session info
-        status = self.canvas.status_line
-        status.update_session(self._session_id)
-        status.update(f"session: {self._session_id[:8]} | generating...")
-
-        self.run_worker(
-            self._run_optimization,
-            name="optimize",
-            thread=True,
-        )
+        self.run_worker(self._run_optimization, name="optimize", thread=True)
 
     def _run_optimization(self) -> None:
-        """Worker thread: call optimize_prompt and populate the canvas."""
         from prompt_master.optimizer import optimize_prompt
         from prompt_master.vibe import _parse_sections
 
@@ -111,36 +94,116 @@ class CanvasApp(App):
             use_api=not self._no_api,
             model=self._model,
         )
-
         sections = _parse_sections(result.optimized_prompt)
-
-        # Schedule UI update on the main thread
         self.call_from_thread(self._apply_optimization, sections, result)
 
     def _apply_optimization(self, sections: dict, result) -> None:
-        """Apply optimization results to the canvas (runs on main thread)."""
+        self.canvas.hide_loading()
         self.canvas.populate_sections(sections)
 
-        # Update status
         status = self.canvas.status_line
         status.update_session(self._session_id)
-
-        # Token estimate
         token_est = len(result.optimized_prompt) // 4
         status.update_tokens(token_est, 50_000)
 
-        # Cost from metadata
         usage_summary = result.metadata.get("usage_summary", "")
         if usage_summary:
-            # Extract cost from "Tokens: X in / Y out | Cost: $0.0123 | Calls: 1"
             for part in usage_summary.split("|"):
                 part = part.strip()
                 if part.startswith("Cost:"):
                     status.update_cost(part.replace("Cost:", "").strip())
                     break
 
+    # ── Floor input: conversation ──────────────────────────────────────
+
+    def on_canvas_user_submitted(self, message: Canvas.UserSubmitted) -> None:
+        """User typed something in the floor input — send to AI for refinement."""
+        user_text = message.text
+
+        if self._no_api:
+            self.notify("Offline mode — edit sections directly above", timeout=3)
+            return
+
+        # Build the refinement prompt from current sections + user message
+        current_prompt = self.canvas.get_prompt_text()
+
+        self._conversation_history.append({"role": "user", "content": user_text})
+        self.canvas.show_loading("refining with AI...")
+
+        self.run_worker(
+            lambda: self._run_refinement(current_prompt, user_text),
+            name="refine",
+            thread=True,
+        )
+
+    def _run_refinement(self, current_prompt: str, user_message: str) -> None:
+        """Worker thread: send current prompt + user request to AI."""
+        from prompt_master.client import ClaudeClient, NoAPIKeyError
+        from prompt_master.vibe import _parse_sections
+
+        system = (
+            "You are a prompt refinement assistant. The user has a prompt they want to improve. "
+            "They will tell you what to change. Apply their feedback and return the COMPLETE "
+            "updated prompt with ALL sections (# Role, # Task, etc.). "
+            "Output ONLY the updated prompt in markdown format — no commentary, no explanation."
+        )
+
+        user_content = (
+            f"Here is the current prompt:\n\n{current_prompt}\n\n"
+            f"---\n\nUser request: {user_message}\n\n"
+            f"Apply this change and return the complete updated prompt."
+        )
+
+        try:
+            client = ClaudeClient(model=self._model)
+            response = client.generate(system, user_content)
+
+            sections = _parse_sections(response)
+            # Filter out empty preamble
+            sections = {k: v for k, v in sections.items() if k != "_preamble" or v.strip()}
+
+            self._conversation_history.append({"role": "assistant", "content": response})
+
+            self.call_from_thread(
+                self._apply_refinement, sections, user_message, client
+            )
+
+        except (NoAPIKeyError, Exception) as e:
+            self.call_from_thread(self._refinement_error, str(e))
+
+    def _apply_refinement(self, sections: dict, user_msg: str, client) -> None:
+        """Apply AI refinement to the canvas."""
+        self.canvas.hide_loading()
+
+        # Update each section with highlights
+        for name, content in sections.items():
+            if name == "_preamble":
+                continue
+            self.canvas.update_section(name, content)
+
+        # Show the exchange
+        updated = [n for n in sections if n != "_preamble"]
+        summary = f"Updated: {', '.join(updated)}" if updated else "No changes"
+        self.canvas.show_exchange(user_msg, summary)
+
+        # Update usage stats
+        status = self.canvas.status_line
+        usage = client.usage.summary()
+        for part in usage.split("|"):
+            part = part.strip()
+            if part.startswith("Cost:"):
+                status.update_cost(part.replace("Cost:", "").strip())
+
+        token_est = len(self.canvas.get_prompt_text()) // 4
+        status.update_tokens(token_est, 50_000)
+
+    def _refinement_error(self, error_msg: str) -> None:
+        self.canvas.hide_loading()
+        self.notify(f"Error: {error_msg}", severity="error", timeout=5)
+
+    # ── Session management ────────────────────────────────────────────
+
     def _load_session(self) -> None:
-        """Resume from a saved session."""
         from prompt_master.session import load_session
         from prompt_master.vibe import _parse_sections
 
@@ -148,7 +211,6 @@ class CanvasApp(App):
             session_id, engine = load_session(self._resume)
             self._session_id = session_id
 
-            # If the engine has a current draft, parse it into sections
             if engine.current_draft:
                 sections = _parse_sections(engine.current_draft)
             elif engine.final_prompt:
@@ -157,12 +219,8 @@ class CanvasApp(App):
                 sections = SCAFFOLD_SECTIONS
 
             self.canvas.populate_sections(sections)
-
             status = self.canvas.status_line
             status.update_session(self._session_id)
-            token_est = len(engine.current_draft or engine.final_prompt or "") // 4
-            if token_est > 0:
-                status.update_tokens(token_est, 50_000)
 
         except FileNotFoundError as exc:
             self.notify(str(exc), severity="error", timeout=5)
@@ -171,12 +229,8 @@ class CanvasApp(App):
     # ── Actions ───────────────────────────────────────────────────────
 
     def action_save(self) -> None:
-        """Save the current prompt to the output file or session."""
         prompt_text = self.canvas.get_prompt_text()
-
         if self._output:
-            from pathlib import Path
-
             path = Path(self._output)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(prompt_text)
@@ -185,9 +239,8 @@ class CanvasApp(App):
             self.notify("No output file specified (use --output)", timeout=3)
 
     def action_help(self) -> None:
-        """Show a help overlay."""
         self.notify(
             "Ctrl+S save | Ctrl+Q quit | Edit sections above | "
-            "Type in the bar below to refine",
+            "Type below to refine with AI | ? help",
             timeout=5,
         )
