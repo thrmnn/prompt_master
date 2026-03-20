@@ -98,6 +98,14 @@ class UsageStats:
 # ── OpenClaw provider ──────────────────────────────────────────────────────
 
 
+# Map prompt-master model names to openclaw agent names
+OPENCLAW_AGENTS = {
+    "haiku": "prompt-master-fast",
+    "sonnet": "main",
+    "opus": "main",
+}
+
+
 class OpenClawClient:
     """Calls LLMs through the OpenClaw CLI — no API key needed."""
 
@@ -105,13 +113,14 @@ class OpenClawClient:
         self,
         model: Optional[str] = None,
         max_tokens: int = 4096,
-        agent: str = "main",
+        agent: Optional[str] = None,
     ):
         if not _openclaw_available():
             raise NoProviderError("OpenClaw CLI not found. Install from https://github.com/openclaw/openclaw")
         self.model_name = model or DEFAULT_MODEL
         self.default_max_tokens = max_tokens
-        self.agent = agent
+        # Use model-specific agent if available, otherwise default
+        self.agent = agent or OPENCLAW_AGENTS.get(self.model_name, "main")
         self.usage = UsageStats()
 
     def _call_openclaw(self, message: str, timeout: int = 120) -> dict:
@@ -122,6 +131,7 @@ class OpenClawClient:
             "--local",
             "--message", message,
             "--json",
+            "--thinking", "off",
         ]
         result = subprocess.run(
             cmd,

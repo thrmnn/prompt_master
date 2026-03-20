@@ -137,7 +137,11 @@ class CanvasApp(App):
         )
 
     def _run_refinement(self, current_prompt: str, user_message: str) -> None:
-        """Worker thread: send current prompt + user request to AI."""
+        """Worker thread: send current prompt + user request to AI.
+
+        Uses haiku by default for fast interactive refinement, unless the
+        user explicitly chose a different model.
+        """
         from prompt_master.client import ClaudeClient, NoAPIKeyError
         from prompt_master.vibe import _parse_sections
 
@@ -154,8 +158,11 @@ class CanvasApp(App):
             f"Apply this change and return the complete updated prompt."
         )
 
+        # Use haiku for refinement (fast) unless user specified otherwise
+        refine_model = self._model if self._model else "haiku"
+
         try:
-            client = ClaudeClient(model=self._model)
+            client = ClaudeClient(model=refine_model)
             response = client.generate(system, user_content)
 
             sections = _parse_sections(response)
