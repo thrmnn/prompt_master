@@ -4,17 +4,41 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prompt-master"
-version = "0.1.0"
-description = "Turn vague ideas into optimized prompts"
+version = "0.5.0"
+description = "Turn vague ideas into optimized prompts — with multi-agent workflow design, conversational refinement, and benchmarking"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.8"
+authors = [
+    {name = "thrmnn", email = "thermann.ai@gmail.com"},
+]
+keywords = ["prompt-engineering", "cli", "claude", "ai", "workflow", "multi-agent"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Text Processing",
+]
 dependencies = [
     "click>=8.1",
     "anthropic>=0.40",
     "tomli>=2.0",
+    "textual>=0.75",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-mock>=3.12"]
+
+[project.urls]
+Homepage = "https://github.com/thrmnn/prompt_master"
+Repository = "https://github.com/thrmnn/prompt_master"
+Issues = "https://github.com/thrmnn/prompt_master/issues"
 
 [project.scripts]
 prompt-master = "prompt_master.cli:main"
@@ -24,3 +48,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py38"
+line-length = 100

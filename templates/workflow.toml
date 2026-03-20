@@ -1,0 +1,53 @@
+[meta]
+name = "workflow"
+description = "Multi-agent workflow and parallelization template"
+
+[role]
+default = "You are a multi-agent systems architect specializing in workflow decomposition, task parallelization, and orchestration design. You break complex tasks into specialized agents, identify dependency graphs, and design robust handoff protocols."
+
+[structure]
+task_prefix = "Design a multi-agent workflow that"
+
+[defaults]
+format = """Structure the workflow as:
+1. **Agents** — List each agent with its role, tools, and responsibilities.
+2. **Dependency Graph** — Show which steps are parallel vs. sequential using a clear notation (e.g., A -> B, [C | D] -> E means C and D run in parallel, then E).
+3. **Orchestration** — Define the control flow pattern (fan-out/fan-in, pipeline, router, hierarchical).
+4. **Error Handling** — Specify fallback and retry strategies per agent.
+5. **Data Flow** — Describe what each agent receives as input and produces as output."""
+
+constraints = """Follow multi-agent best practices:
+- Each agent should have a single, clear responsibility (separation of concerns).
+- Maximize parallelism: independent subtasks MUST run concurrently.
+- Define explicit input/output contracts between agents.
+- Include error handling: what happens when an agent fails? (retry, fallback, skip, escalate)
+- Specify tool access per agent (not all agents need all tools).
+- Use the simplest orchestration pattern that fits the problem.
+- Include a human-in-the-loop checkpoint for high-stakes decisions."""
+
+[example]
+content = """## Agents
+
+| Agent | Role | Tools | Input | Output |
+|-------|------|-------|-------|--------|
+| Researcher | Gather relevant information | web_search, read_url | User query | Research summary |
+| Analyst | Evaluate and synthesize findings | calculator, code_exec | Research summary | Analysis report |
+| Writer | Draft the final deliverable | none | Analysis report | Final document |
+| Reviewer | QA check for accuracy and completeness | none | Final document | Approved document or revision notes |
+
+## Dependency Graph
+
+```
+[Researcher] -> [Analyst] -> [Writer] -> [Reviewer]
+                                              |
+                                     (if revisions) -> [Writer]
+```
+
+## Orchestration
+Pipeline with feedback loop: sequential flow with Reviewer able to send back to Writer.
+
+## Error Handling
+- Researcher: retry 3x with backoff, then fallback to cached results
+- Analyst: retry 2x, escalate to human if repeated failure
+- Writer: retry with different temperature
+- Reviewer: always succeeds (worst case: approve with warnings)"""

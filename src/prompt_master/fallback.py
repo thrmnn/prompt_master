@@ -9,6 +9,12 @@ TARGET_ROLES = {
     "code": "You are an expert software engineer with deep knowledge of best practices, design patterns, and clean code principles.",
     "creative": "You are a skilled creative writer with a strong command of language, narrative, and style.",
     "analysis": "You are an analytical expert skilled at breaking down complex topics, evaluating evidence, and drawing clear conclusions.",
+    "workflow": (
+        "You are a multi-agent systems architect specializing in workflow "
+        "decomposition, task parallelization, and orchestration design. You "
+        "break complex tasks into specialized agents, identify dependency "
+        "graphs, and design robust handoff protocols."
+    ),
 }
 
 TARGET_TASK_PREFIX = {
@@ -16,6 +22,7 @@ TARGET_TASK_PREFIX = {
     "code": "Write code that",
     "creative": "Create a piece of writing that",
     "analysis": "Analyze and provide insights on",
+    "workflow": "Design a multi-agent workflow that",
 }
 
 TARGET_DEFAULT_FORMAT = {
@@ -23,6 +30,15 @@ TARGET_DEFAULT_FORMAT = {
     "code": "Provide the code in a fenced code block with the language specified. Include comments for complex logic.",
     "creative": "Write in polished prose with attention to voice and flow.",
     "analysis": "Structure your response with clear sections, evidence-based reasoning, and a summary of key findings.",
+    "workflow": (
+        "Structure the workflow as:\n"
+        "1. **Agents** — List each agent with its role, tools, and responsibilities.\n"
+        "2. **Dependency Graph** — Show which steps are parallel vs. sequential.\n"
+        "3. **Orchestration** — Define the control flow pattern "
+        "(fan-out/fan-in, pipeline, router, hierarchical).\n"
+        "4. **Error Handling** — Specify fallback and retry strategies per agent.\n"
+        "5. **Data Flow** — Describe what each agent receives and produces."
+    ),
 }
 
 
@@ -65,6 +81,12 @@ def fallback_optimize(
         context_parts.append(f"- **Tone:** {clarifications['tone']}")
     if "evidence" in clarifications:
         context_parts.append(f"- **Data Sources:** {clarifications['evidence']}")
+    if "agents" in clarifications:
+        context_parts.append(f"- **Agents/Roles:** {clarifications['agents']}")
+    if "orchestration" in clarifications:
+        context_parts.append(f"- **Orchestration Pattern:** {clarifications['orchestration']}")
+    if "tools" in clarifications:
+        context_parts.append(f"- **Tools/APIs:** {clarifications['tools']}")
     if context_parts:
         sections.append("# Context\n" + "\n".join(context_parts))
 

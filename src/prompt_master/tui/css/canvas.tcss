@@ -1,0 +1,101 @@
+/* Prompt Master — Canvas theme */
+
+Screen {
+    background: $surface;
+}
+
+/* ── Section blocks ──────────────────────────────────────────────────── */
+
+SectionBlock {
+    width: 1fr;
+    height: auto;
+    padding: 0 1;
+    margin: 0 0 1 0;
+}
+
+SectionBlock .section-header {
+    width: 1fr;
+    height: 1;
+    color: $accent;
+    text-style: bold;
+    padding: 0 1;
+}
+
+SectionBlock .section-score {
+    width: 8;
+    height: 1;
+    color: $text-muted;
+    content-align: right middle;
+    text-style: dim;
+}
+
+SectionBlock TextArea {
+    width: 1fr;
+    height: auto;
+    min-height: 3;
+    border: none;
+    background: $surface;
+    padding: 0 1;
+}
+
+SectionBlock TextArea:focus {
+    border: none;
+    background: $boost;
+}
+
+/* ── Highlight animation for AI-updated sections ─────────────────── */
+
+SectionBlock.ai-highlight {
+    background: $warning 15%;
+}
+
+SectionBlock.ai-highlight-fade {
+    background: $warning 8%;
+}
+
+/* ── Sections container ──────────────────────────────────────────────── */
+
+#sections-container {
+    width: 1fr;
+    height: 1fr;
+    padding: 1 2;
+}
+
+/* ── Conversation zone (placeholder, initially hidden) ───────────── */
+
+#conversation-zone {
+    display: none;
+    width: 1fr;
+    height: auto;
+    max-height: 40%;
+    border-top: solid $primary-background-lighten-2;
+    padding: 1 2;
+}
+
+/* ── Floor input ─────────────────────────────────────────────────────── */
+
+#floor-input {
+    dock: bottom;
+    width: 1fr;
+    height: 3;
+    margin: 0 1;
+    border: round $accent-darken-2;
+    background: $surface;
+}
+
+#floor-input:focus {
+    border: round $accent;
+}
+
+/* ── Status line ─────────────────────────────────────────────────────── */
+
+StatusLine {
+    dock: bottom;
+    width: 1fr;
+    height: 1;
+    background: $surface-darken-1;
+    color: $text-muted;
+    text-style: dim;
+    padding: 0 2;
+    content-align: left middle;
+}

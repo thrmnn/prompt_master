@@ -9,6 +9,9 @@ QUESTIONS = [
     ("language", "Programming language and framework?", ["code"]),
     ("tone", "What tone and style? (formal/casual/technical/etc.)", ["creative"]),
     ("evidence", "What data sources should be referenced?", ["analysis"]),
+    ("agents", "What specialized agents or roles are needed?", ["workflow"]),
+    ("orchestration", "Preferred orchestration pattern? (fan-out/fan-in/pipeline/router/hierarchical)", ["workflow"]),
+    ("tools", "What tools or APIs should agents have access to?", ["workflow"]),
     ("example", "Example of good output? (optional, Enter to skip)", ["all"]),
 ]
 

@@ -17,16 +17,24 @@ class TemplateNotFoundError(Exception):
     pass
 
 
-def load_template(name_or_path: str) -> Dict:
+def load_template(name_or_path: str, validate: bool = True) -> Dict:
     """Load a template by name (user > builtin) or by file path."""
+    from prompt_master.validation import validate_template
+
     path = Path(name_or_path)
     if path.exists() and path.suffix == ".toml":
-        return _parse(path)
+        data = _parse(path)
+        if validate:
+            validate_template(data, name=path.stem)
+        return data
 
     for directory in [USER_TEMPLATE_DIR, BUILTIN_TEMPLATE_DIR]:
         candidate = directory / f"{name_or_path}.toml"
         if candidate.exists():
-            return _parse(candidate)
+            data = _parse(candidate)
+            if validate:
+                validate_template(data, name=name_or_path)
+            return data
 
     raise TemplateNotFoundError(f"Template '{name_or_path}' not found")
 
