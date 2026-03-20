@@ -70,10 +70,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."    # enables AI-powered optimization
 ### Use
 
 ```bash
-# One-shot optimization (template-based, instant)
-prompt-master optimize "build an api" -t code
-
-# AI-powered optimization
+# Optimize a prompt (AI-powered, falls back to template if no API key)
 prompt-master optimize "build an api" -t code
 
 # Interactive: asks clarifying questions first
@@ -81,6 +78,15 @@ prompt-master optimize "build an api" -t code -m interactive
 
 # Chat mode: collaborative back-and-forth with Claude
 prompt-master chat "I want to build something with websockets" -t code
+
+# Vibe mode: explore variations along tone, audience, format, specificity, style
+prompt-master vibe "build a chatbot" -n 4
+
+# Visual canvas: full-screen TUI for prompt crafting
+prompt-master tui "build an api" -t code
+
+# Also works as a Python module
+python -m prompt_master optimize "build an api" -t code
 ```
 
 ---
@@ -94,7 +100,27 @@ prompt-master chat "I want to build something with websockets" -t code
 | **Template** (`--no-api`) | Instant | Good | No |
 | **AI-powered** | 2-5s | Excellent | Yes |
 
-Template mode uses structured slot-filling with domain-specific templates. AI mode sends your idea to Claude with a meta-prompt engineered for prompt optimization. Falls back to template mode gracefully if no API key is set.
+Template mode uses structured slot-filling with domain-specific templates. AI mode sends your idea to Claude with a meta-prompt engineered for prompt optimization. Falls back to template mode automatically if the API is unavailable.
+
+### Vibe Mode
+
+Explore your prompt from multiple angles. Generates variations along five dimensions — tone, audience, format, specificity, and style:
+
+```bash
+# Generate 4 variations (default)
+prompt-master vibe "build a REST API" -t code
+
+# Focus on specific dimensions
+prompt-master vibe "build a REST API" -d tone,audience -n 6
+
+# Save all variations
+prompt-master vibe "build a REST API" -o variations.md
+
+# Works offline too
+prompt-master vibe "build a REST API" --no-api
+```
+
+Each variation is a complete, self-contained prompt optimized for a different perspective on your idea.
 
 ### Five Target Domains
 
@@ -270,14 +296,14 @@ prompt-master tui "chatbot assistant" -o prompt.md
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Explore variations for the current section |
-| `Ctrl+R` | Get AI recommendation for improvement |
-| `Ctrl+D` | Decompose into a multi-agent workflow |
-| `Ctrl+S` | Save prompt |
-| `Ctrl+H` | Toggle conversation history |
-| `Ctrl+Z` | Undo last change |
+| `Tab` | Explore variations for the focused section |
+| `Space` | Open 2D exploration pad to steer along two dimensions |
+| `Ctrl+C` | Copy prompt to clipboard |
+| `Ctrl+S` | Save prompt to file |
 | `?` | Show help overlay |
 | `Ctrl+Q` | Quit |
+
+Type in the floor input bar to refine the prompt through natural language instructions.
 
 ### Benchmarking Suite
 
@@ -350,49 +376,39 @@ cd prompt_master
 ## Architecture
 
 ```
-prompt-master
-├── optimize          Single-shot prompt optimization
-│   ├── API mode      Claude-powered with meta-prompt engineering
-│   └── Template mode Structured slot-filling (instant, offline)
-├── chat              Conversational prompt building
-│   ├── Engine        Multi-turn state machine with marker filtering
-│   ├── Sessions      JSON persistence (~/.prompt_master/sessions/)
-│   └── Display       Streaming output with color formatting
-├── tui               Visual canvas for interactive prompt crafting
-│   ├── Canvas        Full-screen Textual app with split-pane layout
-│   ├── Keybindings   Centralized key definitions and help overlay
-│   └── Sections      Editable prompt sections with live preview
-├── templates         TOML-based prompt templates
-│   ├── Built-in      general, code, creative, analysis, workflow
-│   └── User          ~/.prompt_master/templates/
-├── benchmark         Quality evaluation suite
-│   ├── Cases         23 TOML test cases across 5 domains
-│   ├── Scorer        Automated structural checks
-│   ├── Judge         LLM-as-judge evaluation (optional)
-│   └── Report        Terminal + JSON output
-└── .claude/commands  Claude Code & OpenClaw skills
-    ├── optimize-prompt   Optimize any prompt with PM methodology
-    ├── design-workflow   Design multi-agent workflows
-    └── benchmark         Run and analyze benchmarks
+src/prompt_master/
+├── cli.py              Click CLI: optimize, chat, vibe, tui, benchmark, history, sessions, templates
+├── optimizer.py        Core pipeline: API-powered + template fallback
+├── client.py           Anthropic SDK wrapper (streaming, retry, cost tracking)
+├── fallback.py         Template-based prompt building (offline)
+├── vibe.py             Vibe Mode: VibeEngine, dimension variations, mutation
+├── config.py           User config (~/.prompt_master/config.toml)
+├── prompts.py          System prompts for chat + vibe modes
+├── conversation.py     Multi-turn engine, StreamFilter, Phase state machine
+├── chat.py             Interactive chat loop with slash commands
+├── session.py          Session persistence (~/.prompt_master/sessions/)
+├── display.py          Terminal UX (colors, streaming, banners)
+├── interactive.py      Clarifying question flow
+├── validation.py       Input validation (idea length, template schema)
+├── history.py          Prompt generation history (~/.prompt_master/history.jsonl)
+├── templates/          Built-in TOML templates (general, code, creative, analysis, workflow)
+├── templates.py        Template loading, discovery, persistence
+├── benchmarks/         Quality evaluation suite
+│   ├── cases/          23 TOML test cases across 5 domains
+│   ├── runner.py       Benchmark orchestration
+│   ├── scorer.py       Structural scoring (sections, keywords, specificity)
+│   ├── judge.py        LLM-as-judge evaluation (optional)
+│   └── report.py       Terminal + comparison formatting
+├── tui/                Visual canvas (Textual-based TUI)
+│   ├── app.py          Root application: streaming, attention, variations
+│   ├── canvas.py       Split-pane layout with section blocks
+│   ├── attention.py    Cursor dwell tracker for intelligent whispers
+│   ├── section_vibe.py Per-section variation generation
+│   ├── exploration_pad.py  2D latent space for continuous prompt steering
+│   ├── dimension_nav.py    Discrete dimension navigator
+│   └── ...
+└── __main__.py         python -m prompt_master entry point
 ```
-
-### Module Map
-
-| Module | Purpose |
-|--------|---------|
-| `cli.py` | Click command definitions |
-| `optimizer.py` | Core optimization pipeline (API + fallback) |
-| `client.py` | Anthropic SDK wrapper with streaming |
-| `fallback.py` | Template-based prompt building |
-| `templates.py` | Template loading, discovery, persistence |
-| `prompts.py` | System prompts for chat mode |
-| `conversation.py` | Chat state machine + stream marker filter |
-| `chat.py` | Interactive chat loop orchestration |
-| `session.py` | Session save/load/resume |
-| `display.py` | Terminal UX (colors, streaming, banners) |
-| `interactive.py` | Clarifying question flow |
-| `tui/` | Visual canvas app (Textual-based TUI) |
-| `tui/keybindings.py` | Centralized keybinding definitions and help text |
 
 ---
 
@@ -409,17 +425,54 @@ python -m pytest tests/test_conversation.py -v
 python -m pytest tests/ --cov=prompt_master --cov-report=term-missing
 ```
 
-100+ tests covering: CLI commands, optimization pipeline, template management, conversation engine, stream filtering, session persistence, chat integration, benchmarking, and workflow domain.
+330+ tests covering: CLI commands, optimization pipeline, template management, conversation engine, stream filtering, session persistence, chat integration, vibe mode, TUI (attention, cache, canvas, exploration pad, dimension navigation, section variations), benchmarking, and workflow domain.
 
 ---
 
 ## Configuration
 
+### Environment
+
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `ANTHROPIC_API_KEY` | Claude API access | *(none — template mode)* |
-| `~/.prompt_master/templates/` | Custom templates | *(empty)* |
-| `~/.prompt_master/sessions/` | Chat session storage | *(auto-created)* |
+
+If no env var is set, Prompt Master checks for an OpenClaw API key automatically.
+
+### Config file
+
+Create `~/.prompt_master/config.toml` to set defaults:
+
+```toml
+target = "code"        # default target domain
+model = "haiku"        # default model (haiku, sonnet, opus)
+max_tokens = 4096      # max output tokens
+format = "markdown"    # output format (markdown, json, plain)
+```
+
+### Data directories
+
+| Path | Purpose |
+|------|---------|
+| `~/.prompt_master/config.toml` | User configuration |
+| `~/.prompt_master/templates/` | Custom templates (override built-ins) |
+| `~/.prompt_master/sessions/` | Chat session persistence |
+| `~/.prompt_master/history.jsonl` | Prompt generation history |
+
+### CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `prompt-master optimize "idea"` | One-shot prompt optimization |
+| `prompt-master chat "idea"` | Conversational prompt building |
+| `prompt-master vibe "idea"` | Generate prompt variations |
+| `prompt-master tui "idea"` | Visual canvas (full-screen TUI) |
+| `prompt-master benchmark` | Run quality evaluation suite |
+| `prompt-master templates list\|show\|save` | Manage prompt templates |
+| `prompt-master history list\|show\|clear` | Browse generation history |
+| `prompt-master sessions list\|prune\|delete` | Manage chat sessions |
+
+**Common flags:** `--target/-t` (domain), `--model` (haiku/sonnet/opus), `--no-api` (offline), `--output/-o` (save to file)
 
 ---
 
