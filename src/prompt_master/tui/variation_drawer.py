@@ -6,7 +6,7 @@ Number keys 1-9 to pick, Esc to dismiss, click to select.
 
 from __future__ import annotations
 
-from textual.containers import Container, VerticalScroll
+from textual.containers import Container
 from textual.message import Message
 from textual.widgets import Static
 from textual import events
@@ -22,7 +22,7 @@ class VariationSelected(Message):
 
 
 class _VariationRow(Static):
-    """A single variation row."""
+    """A single variation row. Stores its 1-based index as an attribute."""
 
     DEFAULT_CSS = """
     _VariationRow {
@@ -31,15 +31,16 @@ class _VariationRow(Static):
         height: auto;
         min-height: 1;
         color: $text;
-        margin: 0 0 0 0;
     }
     _VariationRow:hover {
         background: $boost;
     }
-    _VariationRow.selected {
-        background: $accent 20%;
-    }
     """
+
+    def __init__(self, content: str, row_index: int) -> None:
+        # No id= parameter — avoids DuplicateIds entirely
+        super().__init__(content)
+        self.row_index = row_index
 
 
 class VariationDrawer(Container):
@@ -90,27 +91,36 @@ class VariationDrawer(Container):
 
     def show_variations(self, variations: list[dict]) -> None:
         """Populate and reveal the drawer."""
+        self._clear()
         self._variations = list(variations)
-        self._rebuild()
+        self._mount_rows()
         self.add_class("visible")
         self.focus()
 
     def show_loading(self) -> None:
         """Show loading state."""
-        self._variations = []
-        self.remove_children()
-        self.mount(Static(f"[bold]{self._section_name}[/] — generating variations...", classes="drawer-header"))
+        self._clear()
+        self.mount(Static(
+            f"[bold]{self._section_name}[/] — generating variations...",
+            classes="drawer-header",
+        ))
         self.mount(Static("[dim italic]Please wait...[/]"))
         self.add_class("visible")
 
     def hide(self) -> None:
-        """Close the drawer."""
+        """Close the drawer and clean up all children."""
         self.remove_class("visible")
+        self._clear()
 
-    def _rebuild(self) -> None:
-        """Rebuild the drawer contents."""
-        self.remove_children()
+    def _clear(self) -> None:
+        """Remove all child widgets safely."""
+        self._variations = []
+        children = list(self.children)
+        for child in children:
+            child.remove()
 
+    def _mount_rows(self) -> None:
+        """Mount variation rows from current _variations list."""
         n = len(self._variations)
         self.mount(Static(
             f"[bold]{self._section_name}[/] — {n} variation{'s' if n != 1 else ''}",
@@ -121,15 +131,14 @@ class VariationDrawer(Container):
             dim = var.get("dimension", "?")
             val = var.get("value", "?")
             content = var.get("content", "")
-            # Show first 2 lines as preview
             lines = content.strip().splitlines()
             preview = lines[0][:80] if lines else ""
             if len(lines) > 1:
-                preview += f" [dim]...+{len(lines)-1} lines[/]"
+                preview += f" [dim]...+{len(lines) - 1} lines[/]"
 
             self.mount(_VariationRow(
                 f"  [bold cyan][{idx}][/]  [yellow]{dim}={val}[/]  {preview}",
-                id=f"var-{idx}",
+                row_index=idx,
             ))
 
         self.mount(Static("[dim]1-9: pick  |  Esc: close[/]", classes="drawer-hint"))
@@ -162,11 +171,7 @@ class VariationDrawer(Container):
     def on_click(self, event: events.Click) -> None:
         widget = event.widget
         while widget is not None and widget is not self:
-            if isinstance(widget, _VariationRow) and widget.id:
-                try:
-                    num = int(widget.id.split("-")[1])
-                    self._select(num)
-                except (IndexError, ValueError):
-                    pass
+            if isinstance(widget, _VariationRow):
+                self._select(widget.row_index)
                 return
             widget = widget.parent
