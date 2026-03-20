@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [0.5.1] - 2026-03-20
+
+### Fixed
+- **Model catalog** — Updated sonnet/opus to 4.6 model IDs, default model to haiku
+- **API error handling** — All API commands now fall back to template mode gracefully on any error, not just missing API key
+- **CLI error messages** — Show styled "API unavailable" instead of misleading "No API key found"
+- **TUI resilience** — Catches all client/streaming exceptions and falls back to template mode
+- **Benchmark imports** — Fixed `ModuleNotFoundError` from stale import path
+
+### Changed
+- **Package restructure** — Moved `benchmarks/` and `templates/` into `src/prompt_master/` for proper wheel distribution
+- **Added `__main__.py`** — `python -m prompt_master` now works
+- **Added `package-data`** — Templates and benchmark cases are included in wheel builds
+- **Lint cleanup** — Removed 36 unused imports, applied ruff format across codebase
+- **README** — Added Vibe Mode docs, CLI reference table, config file docs, updated architecture and test count (330+)
+
+---
+
 ## [0.5.0] - 2026-03-20
 
 ### Added
@@ -13,8 +31,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   - Full-screen Textual-based canvas with split-pane layout
   - Section-based prompt editing with live preview
   - Variation exploration drawer (`Tab` to explore, `1-9` to pick)
-  - AI-powered recommendations (`Ctrl+R`) and workflow decomposition (`Ctrl+D`)
-  - Conversation panel with streaming responses (`Ctrl+H` to toggle history)
+  - 2D exploration pad (`Space` to steer along two dimensions)
+  - Attention system with dwell-based whispers and variation pre-loading
   - Centralized keybinding system (`keybindings.py`) with `?` help overlay
   - Session resume support (`--resume`) and file output on exit (`--output`)
   - Offline mode (`--no-api`) for template-based-only editing
