@@ -62,6 +62,7 @@ def estimate_cost(model_name: str, input_tokens: int, output_tokens: int) -> flo
 def _openclaw_available() -> bool:
     """Check if openclaw is installed (for backwards compat checks)."""
     import shutil
+
     return shutil.which("openclaw") is not None
 
 
@@ -159,7 +160,7 @@ class ClaudeClient:
             except RETRYABLE_EXCEPTIONS as e:
                 last_exc = e
                 if attempt < MAX_RETRIES - 1:
-                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = RETRY_BASE_DELAY * (2**attempt)
                     time.sleep(delay)
         raise last_exc
 

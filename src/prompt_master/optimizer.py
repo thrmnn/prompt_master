@@ -70,6 +70,8 @@ def optimize_prompt(
             return _api_optimize(idea, target, clarifications, model, max_tokens)
         except NoAPIKeyError:
             pass
+        except Exception:
+            pass  # API error — fall back to template mode
 
     # Fallback to template-based
     result = fallback_optimize(idea, target, clarifications)

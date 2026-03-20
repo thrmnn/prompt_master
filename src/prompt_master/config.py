@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -16,7 +16,7 @@ CONFIG_PATH = Path.home() / ".prompt_master" / "config.toml"
 # Default values
 DEFAULTS = {
     "target": "general",
-    "model": "sonnet",
+    "model": "haiku",
     "max_tokens": 4096,
     "format": "markdown",
 }
