@@ -2,10 +2,10 @@
 
 import pytest
 
-from benchmarks.runner import load_cases, generate_prompts, run_benchmark
-from benchmarks.scorer import ScoreBreakdown, score_prompt, score_batch
-from benchmarks.judge import _parse_judge_response, JudgeResult
-from benchmarks.report import format_report, format_comparison, _progress_bar
+from prompt_master.benchmarks.runner import load_cases, generate_prompts, run_benchmark
+from prompt_master.benchmarks.scorer import ScoreBreakdown, score_prompt, score_batch
+from prompt_master.benchmarks.judge import _parse_judge_response, JudgeResult
+from prompt_master.benchmarks.report import format_report, format_comparison, _progress_bar
 
 
 # ── Case loading ────────────────────────────────────────────────────────────

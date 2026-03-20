@@ -130,21 +130,21 @@ class TestWorkflowBenchmarkCases:
     """Verify workflow benchmark cases load and score."""
 
     def test_workflow_cases_load(self):
-        from benchmarks.runner import load_cases
+        from prompt_master.benchmarks.runner import load_cases
 
         cases = load_cases("workflow")
         assert len(cases) == 5
         assert all(c["domain"] == "workflow" for c in cases)
 
     def test_workflow_benchmark_runs(self):
-        from benchmarks.runner import run_benchmark
+        from prompt_master.benchmarks.runner import run_benchmark
 
         report = run_benchmark(domain="workflow", use_api=False, use_judge=False)
         assert report["summary"]["total_cases"] == 5
         assert report["summary"]["avg_structural_pct"] > 0
 
     def test_workflow_cases_have_agent_keywords(self):
-        from benchmarks.runner import load_cases
+        from prompt_master.benchmarks.runner import load_cases
 
         cases = load_cases("workflow")
         for case in cases:
