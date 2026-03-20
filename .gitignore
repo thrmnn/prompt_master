@@ -14,3 +14,15 @@ env/
 .mypy_cache/
 *.so
 benchmarks/results/
+
+# OpenClaw workspace files (created when openclaw agent uses this dir)
+.openclaw/
+AGENTS.md
+SOUL.md
+IDENTITY.md
+USER.md
+HEARTBEAT.md
+TOOLS.md
+
+# GitHub CI (needs workflow scope token to push)
+.github/
